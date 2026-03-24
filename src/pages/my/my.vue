@@ -1,346 +1,241 @@
 <template>
-    <Sidebar @page-change="handlePageChange">
-        <view class="page-content">
-            <view class="header">
-                <text class="title">登录</text>
-                <text class="subtitle">欢迎使用 AI 求职助手</text>
-            </view>
+	<view class="my-container">
+		<!-- 侧边栏 -->
+		<Sidebar />
+		
+		<!-- 主内容区 -->
+		<view class="main-content">
+			<!-- 用户信息头部 -->
+			<view class="user-header">
+				<view class="avatar-section">
+					<image 
+						src="https://java-ai-wrm.oss-cn-beijing.aliyuncs.com/2026/03/26b32fb2-0452-4117-9605-a90087ffb85c.png" 
+						class="user-avatar" 
+						mode="aspectFill"
+					/>
+					<view class="user-info">
+						<text class="user-name">张同学</text>
+						<text class="user-major">计算机科学与技术 · 本科应届生</text>
+						<text class="user-stats">已完善简历 | 求职意向：前端工程师</text>
+					</view>
+				</view>
+				<button class="edit-btn" @click="editProfile">编辑资料</button>
+			</view>
 
-            <!-- 登录表单 -->
-            <view class="login-form">
-                <view class="form-item">
-                    <text class="form-label">手机号</text>
-                    <input 
-                        type="text" 
-                        class="form-input" 
-                        placeholder="请输入手机号"
-                        v-model="phoneNumber"
-                    />
-                </view>
+			<!-- 功能菜单 -->
+			<view class="menu-section">
+				<view class="menu-group">
+					<text class="group-title">求职管理</text>
+					<view class="menu-item" v-for="item in jobMenus" :key="item.id" @click="handleMenuClick(item)">
+						<text class="menu-icon">{{ item.icon }}</text>
+						<text class="menu-text">{{ item.name }}</text>
+						<text class="menu-arrow">›</text>
+					</view>
+				</view>
 
-                <view class="form-item">
-                    <text class="form-label">验证码</text>
-                    <view class="code-input-wrapper">
-                        <input 
-                            type="text" 
-                            class="form-input code-input" 
-                            placeholder="请输入验证码"
-                            v-model="verifyCode"
-                        />
-                        <button class="send-code-btn" :disabled="countdown > 0">
-                            {{ countdown > 0 ? `${countdown}s后重发` : '获取验证码' }}
-                        </button>
-                    </view>
-                </view>
+				<view class="menu-group">
+					<text class="group-title">学习中心</text>
+					<view class="menu-item" v-for="item in studyMenus" :key="item.id" @click="handleMenuClick(item)">
+						<text class="menu-icon">{{ item.icon }}</text>
+						<text class="menu-text">{{ item.name }}</text>
+						<view class="menu-extra">
+							<text class="menu-badge" v-if="item.badge">{{ item.badge }}</text>
+							<text class="menu-arrow">›</text>
+						</view>
+					</view>
+				</view>
 
-                <button class="login-btn" @click="handleLogin">
-                    <text class="btn-text">登录</text>
-                </button>
-
-                <view class="agreement">
-                    <checkbox-group @change="handleAgreeChange">
-                        <label class="agree-label">
-                            <checkbox value="agree" :checked="agreed" />
-                            <text class="agree-text">我已阅读并同意</text>
-                            <text class="agree-link">《用户协议》</text>
-                            <text class="agree-text">和</text>
-                            <text class="agree-link">《隐私政策》</text>
-                        </label>
-                    </checkbox-group>
-                </view>
-            </view>
-
-            <!-- 其他登录方式 -->
-            <view class="other-login">
-                <view class="divider">
-                    <view class="divider-line"></view>
-                    <text class="divider-text">其他登录方式</text>
-                    <view class="divider-line"></view>
-                </view>
-
-                <view class="social-login">
-                    <view class="social-icon">
-                        <text class="icon">💬</text>
-                        <text class="icon-label">微信</text>
-                    </view>
-                    <view class="social-icon">
-                        <text class="icon">📱</text>
-                        <text class="icon-label">QQ</text>
-                    </view>
-                    <view class="social-icon">
-                        <text class="icon">✉️</text>
-                        <text class="icon-label">邮箱</text>
-                    </view>
-                </view>
-            </view>
-        </view>
-    </Sidebar>
+				<view class="menu-group">
+					<text class="group-title">设置</text>
+					<view class="menu-item" v-for="item in settingMenus" :key="item.id" @click="handleMenuClick(item)">
+						<text class="menu-icon">{{ item.icon }}</text>
+						<text class="menu-text">{{ item.name }}</text>
+						<text class="menu-arrow">›</text>
+					</view>
+				</view>
+			</view>
+		</view>
+	</view>
 </template>
 
-<script>
+<script setup>
+import { ref } from 'vue'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
 
-export default {
-    name: 'My',
-    components: {
-        Sidebar
-    },
-    data() {
-        return {
-            phoneNumber: '',
-            verifyCode: '',
-            countdown: 0,
-            agreed: false
-        }
-    },
-    methods: {
-        handlePageChange(page) {
-            console.log('页面切换到:', page)
-        },
-        handleLogin() {
-            if (!this.phoneNumber) {
-                uni.showToast({
-                    title: '请输入手机号',
-                    icon: 'none'
-                })
-                return
-            }
-            if (!this.verifyCode) {
-                uni.showToast({
-                    title: '请输入验证码',
-                    icon: 'none'
-                })
-                return
-            }
-            if (!this.agreed) {
-                uni.showToast({
-                    title: '请先同意用户协议',
-                    icon: 'none'
-                })
-                return
-            }
-            // 登录逻辑
-            console.log('登录信息:', this.phoneNumber, this.verifyCode)
-            uni.showToast({
-                title: '登录成功',
-                icon: 'success'
-            })
-        },
-        sendCode() {
-            if (this.countdown > 0) return
-            if (!this.phoneNumber) {
-                uni.showToast({
-                    title: '请输入手机号',
-                    icon: 'none'
-                })
-                return
-            }
-            // 发送验证码逻辑
-            this.countdown = 60
-            const timer = setInterval(() => {
-                this.countdown--
-                if (this.countdown <= 0) {
-                    clearInterval(timer)
-                }
-            }, 1000)
-        },
-        handleAgreeChange(e) {
-            this.agreed = e.detail.value.length > 0
-        }
-    }
+const jobMenus = ref([
+	{ id: 'resume', name: '我的简历', icon: '📄' },
+	{ id: 'applications', name: '投递记录', icon: '📤' },
+	{ id: 'favorites', name: '收藏岗位', icon: '❤️' },
+	{ id: 'interviews', name: '面试安排', icon: '📅' }
+])
+
+const studyMenus = ref([
+	{ id: 'courses', name: '学习课程', icon: '📚' },
+	{ id: 'practice', name: '练习记录', icon: '✍️' },
+	{ id: 'mock', name: '模拟面试', icon: '💬', badge: '新' }
+])
+
+const settingMenus = ref([
+	{ id: 'notification', name: '消息通知', icon: '🔔' },
+	{ id: 'privacy', name: '隐私设置', icon: '🔒' },
+	{ id: 'feedback', name: '帮助与反馈', icon: '💬' },
+	{ id: 'about', name: '关于我们', icon: 'ℹ️' }
+])
+
+const handleMenuClick = (item) => {
+	console.log('点击菜单:', item.name)
+	uni.showToast({
+		title: `功能开发中：${item.name}`,
+		icon: 'none'
+	})
+}
+
+const editProfile = () => {
+	console.log('编辑资料')
 }
 </script>
 
-<style lang="scss" scoped>
-.page-content {
-    padding: 32px;
-    background-color: #f9fafb;
-    min-height: 100vh;
+<style scoped lang="scss">
+.my-container {
+	display: flex;
+	height: 100vh;
+	background-color: #f9fafb;
 }
 
-.header {
-    margin-bottom: 40px;
-    text-align: center;
-    
-    .title {
-        font-size: 32px;
-        font-weight: 700;
-        color: #111827;
-        display: block;
-        margin-bottom: 8px;
-    }
-    
-    .subtitle {
-        font-size: 16px;
-        color: #6b7280;
-        display: block;
-    }
+.main-content {
+	flex: 1;
+	margin-left: 20%;
+	padding: 32px;
+	overflow-y: auto;
 }
 
-.login-form {
-    background: #ffffff;
-    padding: 32px;
-    border-radius: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    margin-bottom: 24px;
+// 用户信息头部
+.user-header {
+	background: #ffffff;
+	padding: 32px;
+	border-radius: 16px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	margin-bottom: 24px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
 }
 
-.form-item {
-    margin-bottom: 24px;
-    
-    .form-label {
-        font-size: 14px;
-        font-weight: 600;
-        color: #374151;
-        display: block;
-        margin-bottom: 8px;
-    }
-    
-    .form-input {
-        width: 100%;
-        padding: 12px 16px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        font-size: 16px;
-        transition: all 0.3s;
-        
-        &:focus {
-            border-color: #3b82f6;
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-    }
-    
-    .code-input-wrapper {
-        display: flex;
-        gap: 12px;
-        
-        .code-input {
-            flex: 1;
-        }
-        
-        .send-code-btn {
-            background: #3b82f6;
-            color: #ffffff;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            white-space: nowrap;
-            cursor: pointer;
-            transition: all 0.3s;
-            
-            &:hover:not(:disabled) {
-                background: #2563eb;
-            }
-            
-            &:disabled {
-                background: #9ca3af;
-                cursor: not-allowed;
-            }
-        }
-    }
+.avatar-section {
+	display: flex;
+	align-items: center;
+	gap: 20px;
 }
 
-.login-btn {
-    background: linear-gradient(135deg, #3b82f6, #06b6d4);
-    color: #ffffff;
-    border: none;
-    padding: 16px;
-    border-radius: 8px;
-    font-size: 18px;
-    font-weight: 600;
-    width: 100%;
-    cursor: pointer;
-    transition: all 0.3s;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    margin-top: 32px;
-    
-    &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-    }
-    
-    .btn-text {
-        display: block;
-    }
+.user-avatar {
+	width: 80px;
+	height: 80px;
+	border-radius: 50%;
 }
 
-.agreement {
-    margin-top: 20px;
-    
-    .agree-label {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        cursor: pointer;
-    }
-    
-    .agree-text {
-        font-size: 14px;
-        color: #6b7280;
-    }
-    
-    .agree-link {
-        font-size: 14px;
-        color: #3b82f6;
-        text-decoration: underline;
-        cursor: pointer;
-    }
+.user-info {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
 }
 
-.other-login {
-    background: #ffffff;
-    padding: 32px;
-    border-radius: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+.user-name {
+	font-size: 24px;
+	font-weight: 600;
+	color: #111827;
 }
 
-.divider {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 24px;
-    
-    .divider-line {
-        flex: 1;
-        height: 1px;
-        background: #e5e7eb;
-    }
-    
-    .divider-text {
-        padding: 0 16px;
-        font-size: 14px;
-        color: #9ca3af;
-    }
+.user-major {
+	font-size: 14px;
+	color: #6b7280;
 }
 
-.social-login {
-    display: flex;
-    justify-content: center;
-    gap: 32px;
-    
-    .social-icon {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-        transition: all 0.3s;
-        
-        &:hover {
-            transform: translateY(-4px);
-        }
-        
-        .icon {
-            font-size: 40px;
-        }
-        
-        .icon-label {
-            font-size: 14px;
-            color: #6b7280;
-        }
-    }
+.user-stats {
+	font-size: 13px;
+	color: #3b82f6;
+}
+
+.edit-btn {
+	background: #3b82f6;
+	color: #ffffff;
+	border: none;
+	padding: 12px 24px;
+	border-radius: 8px;
+	font-size: 15px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.3s;
+
+	&:hover {
+		background: #2563eb;
+	}
+}
+
+// 功能菜单
+.menu-section {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.menu-group {
+	background: #ffffff;
+	border-radius: 12px;
+	overflow: hidden;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.group-title {
+	display: block;
+	padding: 16px 20px;
+	background: #f9fafb;
+	font-size: 14px;
+	font-weight: 600;
+	color: #6b7280;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.menu-item {
+	display: flex;
+	align-items: center;
+	padding: 16px 20px;
+	cursor: pointer;
+	transition: all 0.3s;
+
+	&:hover {
+		background: #f9fafb;
+	}
+}
+
+.menu-icon {
+	font-size: 20px;
+	margin-right: 12px;
+	width: 24px;
+	text-align: center;
+}
+
+.menu-text {
+	flex: 1;
+	font-size: 15px;
+	color: #111827;
+}
+
+.menu-extra {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.menu-badge {
+	background: #ef4444;
+	color: #ffffff;
+	padding: 2px 8px;
+	border-radius: 10px;
+	font-size: 12px;
+}
+
+.menu-arrow {
+	font-size: 24px;
+	color: #9ca3af;
 }
 </style>

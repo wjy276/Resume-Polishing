@@ -8,7 +8,8 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
-        api: 'modern-compiler' // 使用现代 API
+        api: 'modern-compiler',
+        silenceDeprecations: ['legacy-js-api'] // 静默旧版 API 警告
       }
     }
   },

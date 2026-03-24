@@ -1,265 +1,283 @@
 <template>
-    <Sidebar @page-change="handlePageChange">
-        <view class="page-content">
-            <view class="header">
-                <text class="title">简历优化</text>
-                <text class="subtitle">专业诊断，打造完美简历</text>
-            </view>
+	<view class="resume-container">
+		<!-- 侧边栏 -->
+		<Sidebar />
+		
+		<!-- 主内容区 -->
+		<view class="main-content">
+			<!-- 顶部 -->
+			<view class="page-header">
+				<text class="page-title">简历优化</text>
+				<text class="page-subtitle">AI 智能分析简历，根据目标岗位自动优化，提供专业修改建议</text>
+			</view>
 
-            <!-- 上传区域 -->
-            <view class="upload-section">
-                <view class="upload-card">
-                    <text class="upload-icon">📄</text>
-                    <text class="upload-title">上传简历</text>
-                    <text class="upload-desc">支持 PDF、Word 格式，最大 10MB</text>
-                    <button class="upload-btn">选择文件</button>
-                </view>
-            </view>
+			<!-- 上传区域 -->
+			<view class="upload-section">
+				<view class="upload-card">
+					<text class="upload-icon">📄</text>
+					<text class="upload-title">上传您的简历</text>
+					<text class="upload-desc">支持 PDF、Word 格式，AI 将自动分析并提供优化建议</text>
+					<button class="upload-btn" @click="uploadResume">
+						<text class="btn-text">选择文件</text>
+					</button>
+				</view>
+			</view>
 
-            <!-- 简历诊断项 -->
-            <view class="resume-items">
-                <view class="resume-item">
-                    <view class="item-header">
-                        <text class="item-icon">📝</text>
-                        <text class="item-title">基本信息完整性</text>
-                        <text class="item-score">85 分</text>
-                    </view>
-                    <view class="progress-bar">
-                        <view class="progress-fill" style="width: 85%"></view>
-                    </view>
-                    <view class="item-suggestions">
-                        <text class="suggestion-text">• 建议添加个人作品集链接</text>
-                    </view>
-                </view>
+			<!-- 简历列表 -->
+			<view class="resume-items">
+				<view class="resume-item" v-for="resume in resumeList" :key="resume.id">
+					<view class="item-header">
+						<text class="item-icon">📋</text>
+						<text class="item-title">{{ resume.name }}</text>
+						<text class="item-score">{{ resume.score }}分</text>
+					</view>
+					<view class="progress-bar">
+						<view class="progress-fill" :style="{ width: resume.score + '%' }"></view>
+					</view>
+					<view class="item-suggestions">
+						<text class="suggestion-text" v-for="(suggestion, index) in resume.suggestions" :key="index">
+							• {{ suggestion }}
+						</text>
+					</view>
+				</view>
+			</view>
 
-                <view class="resume-item">
-                    <view class="item-header">
-                        <text class="item-icon">💼</text>
-                        <text class="item-title">项目经历描述</text>
-                        <text class="item-score">92 分</text>
-                    </view>
-                    <view class="progress-bar">
-                        <view class="progress-fill" style="width: 92%"></view>
-                    </view>
-                    <view class="item-suggestions">
-                        <text class="suggestion-text">• 项目描述清晰，突出了技术栈</text>
-                        <text class="suggestion-text">• 建议量化项目成果</text>
-                    </view>
-                </view>
-
-                <view class="resume-item">
-                    <view class="item-header">
-                        <text class="item-icon">🎯</text>
-                        <text class="item-title">技能匹配度</text>
-                        <text class="item-score">78 分</text>
-                    </view>
-                    <view class="progress-bar">
-                        <view class="progress-fill" style="width: 78%"></view>
-                    </view>
-                    <view class="item-suggestions">
-                        <text class="suggestion-text">• 建议补充 Vue3 相关项目经验</text>
-                        <text class="suggestion-text">• 增加 TypeScript 技能描述</text>
-                    </view>
-                </view>
-            </view>
-
-            <!-- AI 建议 -->
-            <view class="ai-suggestions">
-                <view class="ai-header">
-                    <text class="ai-icon">✨</text>
-                    <text class="ai-title">AI 智能建议</text>
-                </view>
-                <view class="ai-content">
-                    <text class="ai-text">您的简历整体质量不错！建议在项目经历中更多展示技术深度和解决问题的能力。可以补充具体的性能优化案例和技术选型思考。</text>
-                </view>
-            </view>
-        </view>
-    </Sidebar>
+			<!-- AI 建议 -->
+			<view class="ai-suggestions">
+				<view class="ai-header">
+					<text class="ai-icon">✨</text>
+					<text class="ai-title">AI 智能建议</text>
+				</view>
+				<view class="ai-content">
+					<text class="ai-text">
+						根据您的简历和求职意向，建议重点突出项目经验中的技术亮点，
+						量化工作成果，并使用更专业的术语描述职责。同时，建议增加
+						与目标岗位相关的技能关键词，提高简历匹配度。
+					</text>
+				</view>
+			</view>
+		</view>
+	</view>
 </template>
 
-<script>
+<script setup>
+import { ref } from 'vue'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
 
-export default {
-    name: 'Resume',
-    components: {
-        Sidebar
-    },
-    methods: {
-        handlePageChange(page) {
-            console.log('页面切换到:', page)
-        }
-    }
+const resumeList = ref([
+	{
+		id: 1,
+		name: '前端开发工程师简历.pdf',
+		score: 85,
+		suggestions: [
+			'项目经验描述可以更具体，突出技术难点和解决方案',
+			'建议增加量化数据，如"性能提升 30%"',
+			'技能清单可以更详细，列出熟悉程度'
+		]
+	},
+	{
+		id: 2,
+		name: '产品经理简历.pdf',
+		score: 78,
+		suggestions: [
+			'产品描述可以更加结构化，突出核心指标',
+			'建议增加用户调研和数据分析相关内容',
+			'项目成果可以用数据说话，如"日活提升 50%"'
+		]
+	}
+])
+
+const uploadResume = () => {
+	uni.chooseFile({
+		accept: 'file',
+		success: (res) => {
+			console.log('选择的文件:', res)
+			// 这里可以添加上传逻辑
+		}
+	})
 }
 </script>
 
-<style lang="scss" scoped>
-.page-content {
-    padding: 32px;
-    background-color: #f9fafb;
-    min-height: 100vh;
+<style scoped lang="scss">
+.resume-container {
+	display: flex;
+	height: 100vh;
+	background-color: #f9fafb;
 }
 
-.header {
-    margin-bottom: 32px;
-    
-    .title {
-        font-size: 28px;
-        font-weight: 600;
-        color: #111827;
-        display: block;
-        margin-bottom: 8px;
-    }
-    
-    .subtitle {
-        font-size: 16px;
-        color: #6b7280;
-        display: block;
-    }
+.main-content {
+	flex: 1;
+	margin-left: 240px;
+	padding: 32px;
+	overflow-y: auto;
+}
+
+.page-header {
+	margin-bottom: 32px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.page-title {
+	font-size: 28px;
+	font-weight: 600;
+	color: #111827;
+}
+
+.page-subtitle {
+	font-size: 16px;
+	color: #6b7280;
 }
 
 .upload-section {
-    margin-bottom: 32px;
+	margin-bottom: 32px;
 }
 
 .upload-card {
-    background: linear-gradient(135deg, #3b82f6, #06b6d4);
-    padding: 40px;
-    border-radius: 16px;
-    text-align: center;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    
-    .upload-icon {
-        font-size: 64px;
-        display: block;
-        margin-bottom: 16px;
-    }
-    
-    .upload-title {
-        font-size: 24px;
-        font-weight: 600;
-        color: #ffffff;
-        display: block;
-        margin-bottom: 8px;
-    }
-    
-    .upload-desc {
-        font-size: 14px;
-        color: rgba(255, 255, 255, 0.9);
-        display: block;
-        margin-bottom: 24px;
-    }
-    
-    .upload-btn {
-        background: #ffffff;
-        color: #3b82f6;
-        border: none;
-        padding: 12px 40px;
-        border-radius: 8px;
-        font-size: 16px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s;
-        
-        &:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        }
-    }
+	background: linear-gradient(135deg, #3b82f6, #06b6d4);
+	padding: 40px;
+	border-radius: 16px;
+	text-align: center;
+	box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.upload-icon {
+	font-size: 64px;
+	display: block;
+	margin-bottom: 16px;
+}
+
+.upload-title {
+	font-size: 24px;
+	font-weight: 600;
+	color: #ffffff;
+	display: block;
+	margin-bottom: 8px;
+}
+
+.upload-desc {
+	font-size: 14px;
+	color: rgba(255, 255, 255, 0.9);
+	display: block;
+	margin-bottom: 24px;
+}
+
+.upload-btn {
+	background: #ffffff;
+	color: #3b82f6;
+	border: none;
+	padding: 12px 40px;
+	border-radius: 8px;
+	font-size: 16px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.3s;
+	display: inline-block;
+
+	&:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+	}
+}
+
+.btn-text {
+	display: block;
 }
 
 .resume-items {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    margin-bottom: 32px;
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	margin-bottom: 32px;
 }
 
 .resume-item {
-    background: #ffffff;
-    padding: 24px;
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	background: #ffffff;
+	padding: 24px;
+	border-radius: 12px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .item-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-    
-    .item-icon {
-        font-size: 24px;
-    }
-    
-    .item-title {
-        flex: 1;
-        font-size: 18px;
-        font-weight: 600;
-        color: #111827;
-    }
-    
-    .item-score {
-        font-size: 18px;
-        font-weight: 700;
-        color: #3b82f6;
-    }
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.item-icon {
+	font-size: 24px;
+}
+
+.item-title {
+	flex: 1;
+	font-size: 18px;
+	font-weight: 600;
+	color: #111827;
+}
+
+.item-score {
+	font-size: 18px;
+	font-weight: 700;
+	color: #3b82f6;
 }
 
 .progress-bar {
-    height: 8px;
-    background: #f3f4f6;
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 12px;
-    
-    .progress-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #3b82f6, #10b981);
-        border-radius: 4px;
-        transition: width 0.3s;
-    }
+	height: 8px;
+	background: #f3f4f6;
+	border-radius: 4px;
+	overflow: hidden;
+	margin-bottom: 16px;
+}
+
+.progress-fill {
+	height: 100%;
+	background: linear-gradient(90deg, #3b82f6, #10b981);
+	border-radius: 4px;
+	transition: width 0.3s;
 }
 
 .item-suggestions {
-    .suggestion-text {
-        display: block;
-        font-size: 14px;
-        color: #6b7280;
-        line-height: 1.6;
-        margin-bottom: 4px;
-    }
+	.suggestion-text {
+		display: block;
+		font-size: 14px;
+		color: #6b7280;
+		line-height: 1.6;
+		margin-bottom: 4px;
+	}
 }
 
 .ai-suggestions {
-    background: linear-gradient(135deg, #fef3c7, #fde68a);
-    padding: 24px;
-    border-radius: 12px;
-    border: 2px solid #f59e0b;
+	background: linear-gradient(135deg, #fef3c7, #fde68a);
+	padding: 24px;
+	border-radius: 12px;
+	border: 2px solid #f59e0b;
 }
 
 .ai-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-    
-    .ai-icon {
-        font-size: 24px;
-    }
-    
-    .ai-title {
-        font-size: 18px;
-        font-weight: 600;
-        color: #92400e;
-    }
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.ai-icon {
+	font-size: 24px;
+}
+
+.ai-title {
+	font-size: 18px;
+	font-weight: 600;
+	color: #92400e;
 }
 
 .ai-content {
-    .ai-text {
-        font-size: 15px;
-        line-height: 1.8;
-        color: #78350f;
-    }
+	.ai-text {
+		font-size: 15px;
+		line-height: 1.8;
+		color: #78350f;
+		display: block;
+	}
 }
 </style>

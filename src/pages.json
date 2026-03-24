@@ -1,14 +1,14 @@
 {
 	"pages": [
 		{
-			"path": "pages/home/home",
+			"path": "pages/Home/Home",
 			"style": {
 				"navigationBarTitleText": "",
 				"navigationStyle": "custom"
 			}
 		},
 		{
-			"path": "pages/job/job",
+			"path": "pages/Job/Job",
 			"style": {
 				"navigationBarTitleText": "",
 				"navigationStyle": "custom"
@@ -29,13 +29,18 @@
 			}
 		},
 		{
-			"path": "pages/my/my",
+			"path": "pages/My/My",
 			"style": {
 				"navigationBarTitleText": "",
 				"navigationStyle": "custom"
 			}
 		}
 	],
+	"window": {
+    "navigationBarBackgroundColor": "#1e3a8a",
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "AI 求职助手"
+	},
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
 		"navigationBarTitleText": "",
