@@ -97,7 +97,7 @@ const switchPage = (pageId) => {
 
 <style scoped lang="scss">
 $sidebar-bg: #1e3a8a;
-$sidebar-width: 240px;
+$sidebar-width: 400rpx;
 
 .sidebar {
 	width: $sidebar-width;
@@ -105,37 +105,37 @@ $sidebar-width: 240px;
 	color: #ffffff;
 	display: flex;
 	flex-direction: column;
-	padding: 24px;
+	padding: 48rpx;
 	height: 100vh;
 	position: fixed;
 	left: 0;
 	top: 0;
 	z-index: 1000;
-	box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+	box-shadow: 4rpx 0 16rpx rgba(0, 0, 0, 0.1);
 }
 
 .logo-section {
 	display: flex;
 	align-items: center;
-	margin-bottom: 32px;
-	padding-bottom: 24px;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	margin-bottom: 64rpx;
+	padding-bottom: 48rpx;
+	border-bottom: 2rpx solid rgba(255, 255, 255, 0.1);
 }
 
 .logo-icon {
-	width: 48px;
-	height: 48px;
+	width: 96rpx;
+	height: 96rpx;
 	background: linear-gradient(135deg, #3b82f6, #06b6d4);
-	border-radius: 12px;
+	border-radius: 24rpx;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	margin-right: 12px;
+	margin-right: 24rpx;
 	flex-shrink: 0;
 }
 
 .logo-star {
-	font-size: 24px;
+	font-size: 48rpx;
 	color: #ffffff;
 }
 
@@ -145,36 +145,36 @@ $sidebar-width: 240px;
 }
 
 .logo-title {
-	font-size: 20px;
+	font-size: 40rpx;
 	font-weight: 600;
-	margin-bottom: 4px;
+	margin-bottom: 8rpx;
 	white-space: nowrap;
 }
 
 .logo-subtitle {
-	font-size: 12px;
+	font-size: 24rpx;
 	opacity: 0.8;
 	white-space: nowrap;
 }
 
 .role-switch {
 	display: flex;
-	gap: 8px;
-	margin-bottom: 24px;
+	gap: 16rpx;
+	margin-bottom: 48rpx;
 }
 
 .role-btn {
 	flex: 1;
-	padding: 10px 16px;
-	border-radius: 8px;
+	padding: 20rpx 32rpx;
+	border-radius: 16rpx;
 	background: rgba(255, 255, 255, 0.1);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	gap: 6px;
+	gap: 12rpx;
 	cursor: pointer;
 	transition: all 0.3s;
-	font-size: 14px;
+	font-size: 28rpx;
 	border: none;
 	color: #ffffff;
 
@@ -193,15 +193,15 @@ $sidebar-width: 240px;
 	flex: 1;
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 16rpx;
 }
 
 .nav-item {
-	padding: 14px 16px;
-	border-radius: 8px;
+	padding: 28rpx 32rpx;
+	border-radius: 16rpx;
 	display: flex;
 	align-items: center;
-	gap: 12px;
+	gap: 24rpx;
 	cursor: pointer;
 	transition: all 0.3s;
 
@@ -215,13 +215,13 @@ $sidebar-width: 240px;
 }
 
 .nav-icon {
-	font-size: 18px;
-	width: 20px;
+	font-size: 36rpx;
+	width: 40rpx;
 	text-align: center;
 }
 
 .nav-text {
-	font-size: 15px;
+	font-size: 30rpx;
 }
 
 .user-info {
@@ -229,20 +229,20 @@ $sidebar-width: 240px;
 	align-items: center;
 	justify-content: space-between;
 	margin-bottom: 70rpx;
-	padding-top: 24rpx;
-	border-top: 1rpx solid rgba(255, 255, 255, 0.1);
+	padding-top: 48rpx;
+	border-top: 2rpx solid rgba(255, 255, 255, 0.1);
 }
 
 .avatar-wrapper {
 	display: flex;
 	align-items: center;
-	gap: 12px;
+	gap: 24rpx;
 	flex: 1;
 }
 
 .avatar-image {
-	width: 48px;
-	height: 48px;
+	width: 96rpx;
+	height: 96rpx;
 	border-radius: 50%;
 	flex-shrink: 0;
 }
@@ -250,18 +250,18 @@ $sidebar-width: 240px;
 .avatar-details {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
+	gap: 8rpx;
 	overflow: hidden;
 }
 
 .name {
-	font-size: 14px;
+	font-size: 28rpx;
 	font-weight: 500;
 	white-space: nowrap;
 }
 
 .major {
-	font-size: 12px;
+	font-size: 24rpx;
 	opacity: 0.8;
 	white-space: nowrap;
 	overflow: hidden;
@@ -269,7 +269,7 @@ $sidebar-width: 240px;
 }
 
 .settings-icon {
-	font-size: 20px;
+	font-size: 40rpx;
 	opacity: 0.8;
 	cursor: pointer;
 	flex-shrink: 0;

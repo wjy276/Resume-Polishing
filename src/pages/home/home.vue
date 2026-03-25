@@ -151,7 +151,7 @@ console.log('首页已加载')
 .main-content {
 	flex: 1;
 	margin-left: 20%;
-	padding: 24px;
+	padding: 48rpx;
 	overflow-y: auto;
 }
 
@@ -160,23 +160,23 @@ console.log('首页已加载')
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: 24px;
+	margin-bottom: 48rpx;
 }
 
 .search-wrapper {
 	display: flex;
 	align-items: center;
-	width: 500px;
-	height: 44px;
+	width: 1000rpx;
+	height: 88rpx;
 	background: #ffffff;
-	border-radius: 8px;
-	padding: 0 16px;
-	border: 1px solid #e5e7eb;
+	border-radius: 16rpx;
+	padding: 0 32rpx;
+	border: 2rpx solid #e5e7eb;
 }
 
 .search-icon {
-	font-size: 18px;
-	margin-right: 8px;
+	font-size: 36rpx;
+	margin-right: 16rpx;
 }
 
 .search-input {
@@ -184,7 +184,7 @@ console.log('首页已加载')
 	height: 100%;
 	border: none;
 	outline: none;
-	font-size: 14px;
+	font-size: 28rpx;
 }
 
 .search-placeholder {
@@ -194,7 +194,7 @@ console.log('首页已加载')
 .top-right {
 	display: flex;
 	align-items: center;
-	gap: 16px;
+	gap: 32rpx;
 }
 
 .notification {
@@ -203,25 +203,25 @@ console.log('首页已加载')
 }
 
 .bell-icon {
-	font-size: 24px;
+	font-size: 48rpx;
 }
 
 .badge {
 	position: absolute;
-	top: -8px;
-	right: -8px;
+	top: -16rpx;
+	right: -16rpx;
 	background: #ef4444;
 	color: white;
-	font-size: 12px;
-	padding: 2px 6px;
-	border-radius: 10px;
-	min-width: 18px;
+	font-size: 24rpx;
+	padding: 4rpx 12rpx;
+	border-radius: 20rpx;
+	min-width: 36rpx;
 	text-align: center;
 }
 
 .user-avatar {
-	width: 40px;
-	height: 40px;
+	width: 80rpx;
+	height: 80rpx;
 	border-radius: 50%;
 	cursor: pointer;
 }
@@ -229,25 +229,25 @@ console.log('首页已加载')
 // 欢迎横幅
 .welcome-banner {
 	background: linear-gradient(135deg, #1e40af, #06b6d4);
-	border-radius: 16px;
-	padding: 32px;
-	margin-bottom: 32px;
+	border-radius: 32rpx;
+	padding: 64rpx;
+	margin-bottom: 64rpx;
 	color: white;
 }
 
 .banner-content {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: 24rpx;
 }
 
 .greeting {
-	font-size: 28px;
+	font-size: 56rpx;
 	font-weight: 600;
 }
 
 .description {
-	font-size: 15px;
+	font-size: 30rpx;
 	opacity: 0.95;
 }
 
@@ -255,46 +255,46 @@ console.log('首页已加载')
 	background: white;
 	color: #1e40af;
 	border: none;
-	border-radius: 8px;
-	padding: 12px 24px;
-	font-size: 15px;
+	border-radius: 16rpx;
+	padding: 24rpx 48rpx;
+	font-size: 30rpx;
 	font-weight: 500;
 	cursor: pointer;
 	display: inline-flex;
 	align-items: center;
-	gap: 6px;
-	margin-top: 8px;
+	gap: 12rpx;
+	margin-top: 16rpx;
 	transition: all 0.3s;
 
 	&:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+		transform: translateY(-4rpx);
+		box-shadow: 0 8rpx 24rpx rgba(255, 255, 255, 0.3);
 	}
 }
 
 .btn-arrow {
-	font-size: 16px;
+	font-size: 32rpx;
 }
 
 // 功能卡片
 .cards-container {
 	display: flex;
-	gap: 24px;
-	margin-bottom: 32px;
+	gap: 48rpx;
+	margin-bottom: 64rpx;
 }
 
 .card-item {
 	flex: 1;
 	background: white;
-	border-radius: 16px;
-	padding: 24px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	border-radius: 32rpx;
+	padding: 48rpx;
+	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
 	transition: all 0.3s;
 	cursor: pointer;
 
 	&:hover {
-		transform: translateY(-4px);
-		box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+		transform: translateY(-8rpx);
+		box-shadow: 0 16rpx 32rpx rgba(0, 0, 0, 0.15);
 	}
 }
 
@@ -302,17 +302,17 @@ console.log('首页已加载')
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: 16px;
+	margin-bottom: 32rpx;
 }
 
 .card-icon {
-	width: 56px;
-	height: 56px;
-	border-radius: 12px;
+	width: 112rpx;
+	height: 112rpx;
+	border-radius: 24rpx;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 28px;
+	font-size: 56rpx;
 
 	&.resume-icon {
 		background: linear-gradient(135deg, #3b82f6, #06b6d4);
@@ -334,25 +334,25 @@ console.log('首页已加载')
 .status-badge {
 	background: #f3f4f6;
 	color: #6b7280;
-	font-size: 13px;
-	padding: 6px 12px;
-	border-radius: 12px;
+	font-size: 26rpx;
+	padding: 12rpx 24rpx;
+	border-radius: 24rpx;
 }
 
 .card-body {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: 24rpx;
 }
 
 .card-title {
-	font-size: 20px;
+	font-size: 40rpx;
 	font-weight: 600;
 	color: #1f2937;
 }
 
 .card-desc {
-	font-size: 14px;
+	font-size: 28rpx;
 	color: #6b7280;
 	line-height: 1.6;
 }
@@ -361,17 +361,17 @@ console.log('首页已加载')
 	background: #1e40af;
 	color: white;
 	border: none;
-	border-radius: 8px;
-	padding: 12px 20px;
-	font-size: 15px;
+	border-radius: 16rpx;
+	padding: 24rpx 40rpx;
+	font-size: 30rpx;
 	font-weight: 500;
 	cursor: pointer;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 6px;
+	gap: 12rpx;
 	transition: all 0.3s;
-	margin-top: 8px;
+	margin-top: 16rpx;
 
 	&.resume-btn {
 		background: linear-gradient(135deg, #3b82f6, #06b6d4);
@@ -387,46 +387,46 @@ console.log('首页已加载')
 
 	&:hover {
 		opacity: 0.9;
-		transform: translateY(-2px);
+		transform: translateY(-4rpx);
 	}
 }
 
 // 底部区域
 .bottom-section {
 	display: flex;
-	gap: 24px;
+	gap: 48rpx;
 }
 
 .section-item {
 	flex: 1;
 	background: white;
-	border-radius: 12px;
-	padding: 20px 24px;
+	border-radius: 24rpx;
+	padding: 40rpx 48rpx;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
 }
 
 .section-left {
 	display: flex;
 	align-items: center;
-	gap: 12px;
+	gap: 24rpx;
 }
 
 .section-icon {
-	font-size: 20px;
+	font-size: 40rpx;
 }
 
 .section-title {
-	font-size: 16px;
+	font-size: 32rpx;
 	font-weight: 500;
 	color: #1f2937;
 }
 
 .section-action {
 	color: #3b82f6;
-	font-size: 14px;
+	font-size: 28rpx;
 	cursor: pointer;
 	transition: color 0.3s;
 

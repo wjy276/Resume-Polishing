@@ -101,36 +101,36 @@ const viewJob = (jobId) => {
 .main-content {
 	flex: 1;
 	margin-left: 20%;
-	padding: 32px;
+	padding: 64rpx;
 	overflow-y: auto;
 }
 
 .page-header {
-	margin-bottom: 32px;
+	margin-bottom: 64rpx;
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 16rpx;
 }
 
 .page-title {
-	font-size: 28px;
+	font-size: 56rpx;
 	font-weight: 600;
 	color: #111827;
 }
 
 .page-subtitle {
-	font-size: 16px;
+	font-size: 32rpx;
 	color: #6b7280;
 }
 
 .filter-section {
 	display: flex;
-	gap: 16px;
-	margin-bottom: 24px;
+	gap: 32rpx;
+	margin-bottom: 48rpx;
 	background: #ffffff;
-	padding: 20px;
-	border-radius: 12px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	padding: 40rpx;
+	border-radius: 24rpx;
+	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
 }
 
 .filter-item {
@@ -138,37 +138,37 @@ const viewJob = (jobId) => {
 }
 
 .filter-label {
-	font-size: 12px;
+	font-size: 24rpx;
 	color: #6b7280;
 	display: block;
-	margin-bottom: 8px;
+	margin-bottom: 16rpx;
 }
 
 .filter-input {
 	width: 100%;
-	padding: 10px 12px;
-	border: 1px solid #e5e7eb;
-	border-radius: 8px;
-	font-size: 14px;
+	padding: 20rpx 24rpx;
+	border: 2rpx solid #e5e7eb;
+	border-radius: 16rpx;
+	font-size: 28rpx;
 	outline: none;
 }
 
 .job-list {
 	display: flex;
 	flex-direction: column;
-	gap: 16px;
+	gap: 32rpx;
 }
 
 .job-card {
 	background: #ffffff;
-	padding: 24px;
-	border-radius: 12px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	padding: 48rpx;
+	border-radius: 24rpx;
+	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
 	cursor: pointer;
 	transition: all 0.3s;
 
 	&:hover {
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.15);
 	}
 }
 
@@ -176,73 +176,73 @@ const viewJob = (jobId) => {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: 8px;
+	margin-bottom: 16rpx;
 }
 
 .job-title {
-	font-size: 18px;
+	font-size: 36rpx;
 	font-weight: 600;
 	color: #111827;
 }
 
 .job-salary {
-	font-size: 18px;
+	font-size: 36rpx;
 	font-weight: 700;
 	color: #10b981;
 }
 
 .job-company {
-	font-size: 14px;
+	font-size: 28rpx;
 	color: #6b7280;
-	margin-bottom: 12px;
+	margin-bottom: 24rpx;
 }
 
 .job-tags {
 	display: flex;
-	gap: 8px;
-	margin-bottom: 16px;
+	gap: 16rpx;
+	margin-bottom: 32rpx;
 	flex-wrap: wrap;
 }
 
 .job-tag {
-	padding: 4px 12px;
+	padding: 8rpx 24rpx;
 	background: #eff6ff;
 	color: #3b82f6;
-	border-radius: 4px;
-	font-size: 12px;
+	border-radius: 8rpx;
+	font-size: 24rpx;
 }
 
 .job-match {
 	display: flex;
 	align-items: center;
-	gap: 12px;
+	gap: 24rpx;
 }
 
 .match-label {
-	font-size: 14px;
+	font-size: 28rpx;
 	color: #6b7280;
 }
 
 .match-bar {
 	flex: 1;
-	height: 6px;
+	height: 12rpx;
 	background: #e5e7eb;
-	border-radius: 3px;
+	border-radius: 6rpx;
 	overflow: hidden;
 }
 
 .match-fill {
 	height: 100%;
 	background: linear-gradient(90deg, #3b82f6, #10b981);
-	border-radius: 3px;
+	border-radius: 6rpx;
 	transition: width 0.3s;
 }
 
 .match-value {
-	font-size: 14px;
+	font-size: 28rpx;
 	font-weight: 600;
 	color: #3b82f6;
-	min-width: 45px;
+	min-width: 90rpx;
 	text-align: right;
 }
 </style>

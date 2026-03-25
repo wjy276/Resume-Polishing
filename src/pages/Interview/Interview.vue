@@ -131,186 +131,186 @@ const startInterview = () => {
 .main-content {
 	flex: 1;
 	margin-left: 20%;
-	padding: 32px;
+	padding: 64rpx;
 	overflow-y: auto;
 }
 
 .page-header {
-	margin-bottom: 32px;
+	margin-bottom: 64rpx;
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 16rpx;
 }
 
 .page-title {
-	font-size: 28px;
+	font-size: 56rpx;
 	font-weight: 600;
 	color: #111827;
 }
 
 .page-subtitle {
-	font-size: 16px;
+	font-size: 32rpx;
 	color: #6b7280;
 }
 
 .mode-section {
 	display: grid;
 	grid-template-columns: repeat(3, 1fr);
-	gap: 20px;
-	margin-bottom: 32px;
+	gap: 40rpx;
+	margin-bottom: 64rpx;
 }
 
 .mode-card {
 	background: #ffffff;
-	padding: 24px;
-	border-radius: 12px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	padding: 48rpx;
+	border-radius: 24rpx;
+	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
 	cursor: pointer;
 	transition: all 0.3s;
 	position: relative;
 	text-align: center;
 
 	&:hover {
-		transform: translateY(-4px);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		transform: translateY(-8rpx);
+		box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.15);
 	}
 
 	&.active {
-		border: 2px solid #3b82f6;
+		border: 4rpx solid #3b82f6;
 		background: #eff6ff;
 	}
 }
 
 .mode-icon {
-	font-size: 48px;
+	font-size: 96rpx;
 	display: block;
-	margin-bottom: 16px;
+	margin-bottom: 32rpx;
 }
 
 .mode-title {
-	font-size: 18px;
+	font-size: 36rpx;
 	font-weight: 600;
 	color: #111827;
 	display: block;
-	margin-bottom: 8px;
+	margin-bottom: 16rpx;
 }
 
 .mode-desc {
-	font-size: 14px;
+	font-size: 28rpx;
 	color: #6b7280;
 	display: block;
-	margin-bottom: 12px;
+	margin-bottom: 24rpx;
 }
 
 .mode-tag {
 	background: #ef4444;
 	color: #ffffff;
-	padding: 4px 12px;
-	border-radius: 12px;
-	font-size: 12px;
+	padding: 8rpx 24rpx;
+	border-radius: 24rpx;
+	font-size: 24rpx;
 	position: absolute;
-	top: 12px;
-	right: 12px;
+	top: 24rpx;
+	right: 24rpx;
 }
 
 .interview-records {
-	margin-bottom: 32px;
+	margin-bottom: 64rpx;
 }
 
 .section-title {
-	font-size: 18px;
+	font-size: 36rpx;
 	font-weight: 600;
 	color: #111827;
-	margin-bottom: 16px;
+	margin-bottom: 32rpx;
 	display: block;
 }
 
 .record-list {
 	display: flex;
 	flex-direction: column;
-	gap: 16px;
+	gap: 32rpx;
 }
 
 .record-item {
 	background: #ffffff;
-	padding: 20px;
-	border-radius: 12px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	padding: 40rpx;
+	border-radius: 24rpx;
+	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
 }
 
 .record-header {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: 12px;
+	margin-bottom: 24rpx;
 }
 
 .record-title {
-	font-size: 16px;
+	font-size: 32rpx;
 	font-weight: 600;
 	color: #111827;
 }
 
 .record-score {
-	font-size: 20px;
+	font-size: 40rpx;
 	font-weight: 700;
 	color: #10b981;
 }
 
 .record-info {
 	display: flex;
-	gap: 16px;
-	margin-bottom: 12px;
+	gap: 32rpx;
+	margin-bottom: 24rpx;
 }
 
 .record-date,
 .record-duration {
-	font-size: 14px;
+	font-size: 28rpx;
 	color: #6b7280;
 }
 
 .record-tags {
 	display: flex;
-	gap: 8px;
+	gap: 16rpx;
 	flex-wrap: wrap;
 }
 
 .record-tag {
-	padding: 4px 12px;
+	padding: 8rpx 24rpx;
 	background: #f3f4f6;
 	color: #374151;
-	border-radius: 4px;
-	font-size: 12px;
+	border-radius: 8rpx;
+	font-size: 24rpx;
 }
 
 .start-section {
 	text-align: center;
-	margin-top: 40px;
+	margin-top: 80rpx;
 }
 
 .start-btn {
 	background: linear-gradient(135deg, #3b82f6, #06b6d4);
 	color: #ffffff;
 	border: none;
-	padding: 16px 60px;
-	border-radius: 12px;
-	font-size: 18px;
+	padding: 32rpx 120rpx;
+	border-radius: 24rpx;
+	font-size: 36rpx;
 	font-weight: 600;
 	cursor: pointer;
 	transition: all 0.3s;
 	display: inline-flex;
 	align-items: center;
-	gap: 12px;
-	box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+	gap: 24rpx;
+	box-shadow: 0 8rpx 24rpx rgba(59, 130, 246, 0.3);
 
 	&:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+		transform: translateY(-4rpx);
+		box-shadow: 0 12rpx 40rpx rgba(59, 130, 246, 0.4);
 	}
 }
 
 .btn-icon {
-	font-size: 20px;
+	font-size: 40rpx;
 }
 
 .btn-text {

@@ -107,77 +107,77 @@ const uploadResume = () => {
 
 .main-content {
 	flex: 1;
-	margin-left: 240px;
-	padding: 32px;
+	margin-left: 20%;
+	padding: 64rpx;
 	overflow-y: auto;
 }
 
 .page-header {
-	margin-bottom: 32px;
+	margin-bottom: 64rpx;
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 16rpx;
 }
 
 .page-title {
-	font-size: 28px;
+	font-size: 56rpx;
 	font-weight: 600;
 	color: #111827;
 }
 
 .page-subtitle {
-	font-size: 16px;
+	font-size: 32rpx;
 	color: #6b7280;
 }
 
 .upload-section {
-	margin-bottom: 32px;
+	margin-bottom: 64rpx;
 }
 
 .upload-card {
 	background: linear-gradient(135deg, #3b82f6, #06b6d4);
-	padding: 40px;
-	border-radius: 16px;
+	padding: 80rpx;
+	border-radius: 32rpx;
 	text-align: center;
-	box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+	box-shadow: 0 8rpx 24rpx rgba(59, 130, 246, 0.3);
 }
 
 .upload-icon {
-	font-size: 64px;
+	font-size: 128rpx;
 	display: block;
-	margin-bottom: 16px;
+	margin-bottom: 32rpx;
 }
 
 .upload-title {
-	font-size: 24px;
+	font-size: 48rpx;
 	font-weight: 600;
 	color: #ffffff;
 	display: block;
-	margin-bottom: 8px;
+	margin-bottom: 16rpx;
 }
 
 .upload-desc {
-	font-size: 14px;
+	font-size: 28rpx;
 	color: rgba(255, 255, 255, 0.9);
 	display: block;
-	margin-bottom: 24px;
+	margin-bottom: 48rpx;
 }
 
 .upload-btn {
 	background: #ffffff;
 	color: #3b82f6;
 	border: none;
-	padding: 12px 40px;
-	border-radius: 8px;
-	font-size: 16px;
+	padding: 24rpx 80rpx;
+	border-radius: 16rpx;
+	font-size: 32rpx;
 	font-weight: 600;
 	cursor: pointer;
 	transition: all 0.3s;
 	display: inline-block;
 
 	&:hover {
-		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+		transform: translateY(-4rpx);
+		box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.2);
 	}
 }
 
@@ -188,93 +188,93 @@ const uploadResume = () => {
 .resume-items {
 	display: flex;
 	flex-direction: column;
-	gap: 20px;
-	margin-bottom: 32px;
+	gap: 40rpx;
+	margin-bottom: 64rpx;
 }
 
 .resume-item {
 	background: #ffffff;
-	padding: 24px;
-	border-radius: 12px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	padding: 48rpx;
+	border-radius: 24rpx;
+	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
 }
 
 .item-header {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	margin-bottom: 16px;
+	gap: 24rpx;
+	margin-bottom: 32rpx;
 }
 
 .item-icon {
-	font-size: 24px;
+	font-size: 48rpx;
 }
 
 .item-title {
 	flex: 1;
-	font-size: 18px;
+	font-size: 36rpx;
 	font-weight: 600;
 	color: #111827;
 }
 
 .item-score {
-	font-size: 18px;
+	font-size: 36rpx;
 	font-weight: 700;
 	color: #3b82f6;
 }
 
 .progress-bar {
-	height: 8px;
+	height: 16rpx;
 	background: #f3f4f6;
-	border-radius: 4px;
+	border-radius: 8rpx;
 	overflow: hidden;
-	margin-bottom: 16px;
+	margin-bottom: 32rpx;
 }
 
 .progress-fill {
 	height: 100%;
 	background: linear-gradient(90deg, #3b82f6, #10b981);
-	border-radius: 4px;
+	border-radius: 8rpx;
 	transition: width 0.3s;
 }
 
 .item-suggestions {
 	.suggestion-text {
 		display: block;
-		font-size: 14px;
+		font-size: 28rpx;
 		color: #6b7280;
 		line-height: 1.6;
-		margin-bottom: 4px;
+		margin-bottom: 8rpx;
 	}
 }
 
 .ai-suggestions {
 	background: linear-gradient(135deg, #fef3c7, #fde68a);
-	padding: 24px;
-	border-radius: 12px;
-	border: 2px solid #f59e0b;
+	padding: 48rpx;
+	border-radius: 24rpx;
+	border: 4rpx solid #f59e0b;
 }
 
 .ai-header {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	margin-bottom: 16px;
+	gap: 24rpx;
+	margin-bottom: 32rpx;
 }
 
 .ai-icon {
-	font-size: 24px;
+	font-size: 48rpx;
 }
 
 .ai-title {
-	font-size: 18px;
+	font-size: 36rpx;
 	font-weight: 600;
 	color: #92400e;
 }
 
 .ai-content {
 	.ai-text {
-		font-size: 15px;
+		font-size: 30rpx;
 		line-height: 1.8;
 		color: #78350f;
 		display: block;

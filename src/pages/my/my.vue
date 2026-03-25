@@ -105,17 +105,17 @@ const editProfile = () => {
 .main-content {
 	flex: 1;
 	margin-left: 20%;
-	padding: 32px;
+	padding: 64rpx;
 	overflow-y: auto;
 }
 
 // 用户信息头部
 .user-header {
 	background: #ffffff;
-	padding: 32px;
-	border-radius: 16px;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-	margin-bottom: 24px;
+	padding: 64rpx;
+	border-radius: 32rpx;
+	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
+	margin-bottom: 48rpx;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
@@ -124,34 +124,34 @@ const editProfile = () => {
 .avatar-section {
 	display: flex;
 	align-items: center;
-	gap: 20px;
+	gap: 40rpx;
 }
 
 .user-avatar {
-	width: 80px;
-	height: 80px;
+	width: 160rpx;
+	height: 160rpx;
 	border-radius: 50%;
 }
 
 .user-info {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 16rpx;
 }
 
 .user-name {
-	font-size: 24px;
+	font-size: 48rpx;
 	font-weight: 600;
 	color: #111827;
 }
 
 .user-major {
-	font-size: 14px;
+	font-size: 28rpx;
 	color: #6b7280;
 }
 
 .user-stats {
-	font-size: 13px;
+	font-size: 26rpx;
 	color: #3b82f6;
 }
 
@@ -159,9 +159,9 @@ const editProfile = () => {
 	background: #3b82f6;
 	color: #ffffff;
 	border: none;
-	padding: 12px 24px;
-	border-radius: 8px;
-	font-size: 15px;
+	padding: 24rpx 48rpx;
+	border-radius: 16rpx;
+	font-size: 30rpx;
 	font-weight: 500;
 	cursor: pointer;
 	transition: all 0.3s;
@@ -175,30 +175,30 @@ const editProfile = () => {
 .menu-section {
 	display: flex;
 	flex-direction: column;
-	gap: 20px;
+	gap: 40rpx;
 }
 
 .menu-group {
 	background: #ffffff;
-	border-radius: 12px;
+	border-radius: 24rpx;
 	overflow: hidden;
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
 }
 
 .group-title {
 	display: block;
-	padding: 16px 20px;
+	padding: 32rpx 40rpx;
 	background: #f9fafb;
-	font-size: 14px;
+	font-size: 28rpx;
 	font-weight: 600;
 	color: #6b7280;
-	border-bottom: 1px solid #e5e7eb;
+	border-bottom: 2rpx solid #e5e7eb;
 }
 
 .menu-item {
 	display: flex;
 	align-items: center;
-	padding: 16px 20px;
+	padding: 32rpx 40rpx;
 	cursor: pointer;
 	transition: all 0.3s;
 
@@ -208,34 +208,34 @@ const editProfile = () => {
 }
 
 .menu-icon {
-	font-size: 20px;
-	margin-right: 12px;
-	width: 24px;
+	font-size: 40rpx;
+	margin-right: 24rpx;
+	width: 48rpx;
 	text-align: center;
 }
 
 .menu-text {
 	flex: 1;
-	font-size: 15px;
+	font-size: 30rpx;
 	color: #111827;
 }
 
 .menu-extra {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 16rpx;
 }
 
 .menu-badge {
 	background: #ef4444;
 	color: #ffffff;
-	padding: 2px 8px;
-	border-radius: 10px;
-	font-size: 12px;
+	padding: 4rpx 16rpx;
+	border-radius: 20rpx;
+	font-size: 24rpx;
 }
 
 .menu-arrow {
-	font-size: 24px;
+	font-size: 48rpx;
 	color: #9ca3af;
 }
 </style>
