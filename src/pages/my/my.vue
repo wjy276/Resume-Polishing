@@ -93,6 +93,8 @@ const handleMenuClick = (item) => {
 const editProfile = () => {
 	console.log('编辑资料')
 }
+
+
 </script>
 
 <style scoped lang="scss">

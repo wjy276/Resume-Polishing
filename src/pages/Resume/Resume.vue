@@ -93,6 +93,7 @@ const uploadResume = () => {
 		success: (res) => {
 			console.log('选择的文件:', res)
 			// 这里可以添加上传逻辑
+			uni.navigateTo({ url: '/pages/Resume/ResumeTemplate' })
 		}
 	})
 }

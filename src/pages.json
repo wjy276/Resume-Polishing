@@ -1,6 +1,13 @@
 {
 	"pages": [
 		{
+			"path": "pages/Login/Login",
+			"style": {
+				"navigationBarTitleText": "",
+				"navigationStyle": "custom"
+			}
+		},
+		{
 			"path": "pages/Home/Home",
 			"style": {
 				"navigationBarTitleText": "",
@@ -34,12 +41,18 @@
 				"navigationBarTitleText": "",
 				"navigationStyle": "custom"
 			}
+		},
+		{
+			"path": "pages/Resume/ResumeTemplate",
+			"style": {
+				"navigationBarTitleText": "ResumeTemplate"
+			}
 		}
 	],
 	"window": {
-    "navigationBarBackgroundColor": "#1e3a8a",
-    "navigationBarTextStyle": "white",
-    "navigationBarTitleText": "AI 求职助手"
+		"navigationBarBackgroundColor": "#1e3a8a",
+		"navigationBarTextStyle": "white",
+		"navigationBarTitleText": "AI 求职助手"
 	},
 	"globalStyle": {
 		"navigationBarTextStyle": "black",

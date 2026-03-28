@@ -1,5 +1,15 @@
 <template>
 	<view class="sidebar">
+		<!-- 页面切换加载遮罩 -->
+		<view class="loading-overlay" :class="{ show: isNavigating }">
+			<view class="loading-spinner">
+				<view class="spinner-ring"></view>
+				<view class="spinner-ring"></view>
+				<view class="spinner-ring"></view>
+			</view>
+			<text class="loading-text">{{ loadingText }}</text>
+		</view>
+
 		<!-- Logo 区域 -->
 		<view class="logo-section">
 			<view class="logo-icon">
@@ -56,7 +66,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
 // 导航菜单配置
 const menuItems = ref([
@@ -70,34 +80,185 @@ const menuItems = ref([
 // 当前页面
 const currentPage = ref('home')
 
+// 导航加载状态
+const isNavigating = ref(false)
+const loadingText = ref('加载中...')
+
+// 加载文字配置
+const loadingTexts = {
+	home: '正在进入首页...',
+	job: '正在加载职位...',
+	resume: '正在准备简历...',
+	interview: '正在启动面试...',
+	my: '正在加载个人中心...'
+}
+
+// 根据当前路由路径获取页面ID
+const getPageIdFromRoute = () => {
+	const pages = getCurrentPages()
+	if (pages.length > 0) {
+		const currentPage = pages[pages.length - 1]
+		const route = currentPage.route || ''
+		// 匹配路由路径
+		if (route.includes('Home')) return 'home'
+		if (route.includes('Job')) return 'job'
+		if (route.includes('Resume')) return 'resume'
+		if (route.includes('Interview')) return 'interview'
+		if (route.includes('My')) return 'my'
+	}
+	return 'home'
+}
+
 // 切换页面
 const switchPage = (pageId) => {
+	// 如果正在导航或已经是当前页面，直接返回
+	if (isNavigating.value || currentPage.value === pageId) return
+
+	// 显示加载动画
+	isNavigating.value = true
+	loadingText.value = loadingTexts[pageId] || '加载中...'
+
+	// 先更新状态，确保高光立即显示
 	currentPage.value = pageId
-	
+
 	// 使用 uni-app 路由跳转
 	const pageMap = {
 		home: '/pages/Home/Home',
 		job: '/pages/Job/Job',
 		resume: '/pages/Resume/Resume',
-		interview: '/pages/Interview/Interview', 
+		interview: '/pages/Interview/Interview',
 		my: '/pages/My/My'
 	}
 
 	if (pageMap[pageId]) {
-		uni.navigateTo({ 
-			url: pageMap[pageId],
-			fail: () => {
-				// 如果页面已打开，使用 switchTab
-				console.log('页面已打开或跳转失败')
-			}
-		})
+		// 延迟一点跳转，让动画先显示
+		setTimeout(() => {
+			uni.redirectTo({
+				url: pageMap[pageId],
+				success: () => {
+					// 页面跳转成功后隐藏加载
+					setTimeout(() => {
+						isNavigating.value = false
+					}, 100)
+				},
+				fail: () => {
+					// 如果 redirectTo 失败，尝试 navigateTo
+					uni.navigateTo({
+						url: pageMap[pageId],
+						success: () => {
+							setTimeout(() => {
+								isNavigating.value = false
+							}, 100)
+						},
+						fail: () => {
+							isNavigating.value = false
+							console.log('页面跳转失败')
+						}
+					})
+				}
+			})
+		}, 150)
 	}
 }
+
+// 组件挂载时同步当前页面状态
+onMounted(() => {
+	currentPage.value = getPageIdFromRoute()
+})
 </script>
 
 <style scoped lang="scss">
 $sidebar-bg: #1e3a8a;
 $sidebar-width: 400rpx;
+
+// 加载遮罩样式
+.loading-overlay {
+	position: fixed;
+	top: 0;
+	left: $sidebar-width;
+	right: 0;
+	bottom: 0;
+	background: rgba(255, 255, 255, 0.95);
+	backdrop-filter: blur(8rpx);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	z-index: 9999;
+	opacity: 0;
+	visibility: hidden;
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+	&.show {
+		opacity: 1;
+		visibility: visible;
+
+		.loading-spinner {
+			.spinner-ring {
+				animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+
+				&:nth-child(1) {
+					animation-delay: -0.45s;
+				}
+				&:nth-child(2) {
+					animation-delay: -0.3s;
+				}
+				&:nth-child(3) {
+					animation-delay: -0.15s;
+				}
+			}
+		}
+
+		.loading-text {
+			animation: fadeInUp 0.4s ease forwards;
+		}
+	}
+}
+
+.loading-spinner {
+	display: flex;
+	gap: 16rpx;
+	margin-bottom: 32rpx;
+
+	.spinner-ring {
+		width: 24rpx;
+		height: 24rpx;
+		border-radius: 50%;
+		background: linear-gradient(135deg, #3b82f6, #06b6d4);
+		animation: none;
+	}
+}
+
+.loading-text {
+	font-size: 28rpx;
+	color: #1e3a8a;
+	font-weight: 500;
+	letter-spacing: 2rpx;
+	opacity: 0;
+	transform: translateY(20rpx);
+}
+
+@keyframes spin {
+	0% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(0.5);
+		opacity: 0.5;
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}
+
+@keyframes fadeInUp {
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
 
 .sidebar {
 	width: $sidebar-width;
@@ -203,14 +364,70 @@ $sidebar-width: 400rpx;
 	align-items: center;
 	gap: 24rpx;
 	cursor: pointer;
-	transition: all 0.3s;
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	position: relative;
+	overflow: hidden;
 
-	&.active {
-		background: rgba(255, 255, 255, 0.15);
+	// 点击波纹效果基础
+	&::before {
+		content: '';
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 0;
+		height: 0;
+		background: rgba(255, 255, 255, 0.3);
+		border-radius: 50%;
+		transform: translate(-50%, -50%);
+		transition: width 0.6s ease, height 0.6s ease;
 	}
 
-	&:hover {
-		background: rgba(255, 255, 255, 0.1);
+	&.active {
+		background: linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.15));
+		box-shadow:
+			0 4rpx 12rpx rgba(0, 0, 0, 0.15),
+			inset 0 1rpx 0 rgba(255, 255, 255, 0.2);
+		backdrop-filter: blur(8rpx);
+		border: 1rpx solid rgba(255, 255, 255, 0.2);
+
+		.nav-text {
+			font-weight: 600;
+			letter-spacing: 1rpx;
+		}
+
+		.nav-icon {
+			transform: scale(1.1);
+			filter: drop-shadow(0 2rpx 4rpx rgba(0, 0, 0, 0.2));
+		}
+
+		// 左侧高光指示条
+		&::after {
+			content: '';
+			position: absolute;
+			left: 0;
+			top: 50%;
+			transform: translateY(-50%);
+			width: 6rpx;
+			height: 60%;
+			background: linear-gradient(180deg, #ffffff, rgba(255, 255, 255, 0.6));
+			border-radius: 0 3rpx 3rpx 0;
+			box-shadow: 0 0 12rpx rgba(255, 255, 255, 0.5);
+		}
+	}
+
+	&:hover:not(.active) {
+		background: rgba(255, 255, 255, 0.12);
+		transform: translateX(8rpx);
+	}
+
+	&:active {
+		transform: scale(0.98);
+		background: rgba(255, 255, 255, 0.2);
+
+		&::before {
+			width: 200%;
+			height: 200%;
+		}
 	}
 }
 
@@ -218,10 +435,12 @@ $sidebar-width: 400rpx;
 	font-size: 36rpx;
 	width: 40rpx;
 	text-align: center;
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-text {
 	font-size: 30rpx;
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .user-info {
