@@ -48,25 +48,39 @@
 		</view>
 
 		<!-- 用户信息 -->
-		<view class="user-info">
+		<view class="user-info" @click="handleUserClick">
 			<view class="avatar-wrapper">
 				<image
-					src="https://java-ai-wrm.oss-cn-beijing.aliyuncs.com/2026/03/26b32fb2-0452-4117-9605-a90087ffb85c.png"
+					:src="userAvatar"
 					mode="aspectFill"
 					class="avatar-image"
 				/>
 				<view class="avatar-details">
-					<text class="name">张同学</text>
-					<text class="major">计算机科学与技术</text>
+					<text class="name">{{ userName }}</text>
+					<text class="major">{{ userMajor }}</text>
 				</view>
 			</view>
-			<text class="settings-icon">⚙</text>
+			<text class="settings-icon" v-if="userStore.isLogin">⚙</text>
+			<text class="login-hint" v-else>登录</text>
 		</view>
+
+		<!-- 登录/注册弹窗 -->
+		<LoginPopup
+			v-model:visible="showLoginPopup"
+			@success="handleLoginSuccess"
+		/>
 	</view>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import LoginPopup from '@/components/LoginPopup/LoginPopup.vue'
+import { useUserStore } from '@/stores/user.js'
+
+const userStore = useUserStore()
+
+// 登录弹窗状态
+const showLoginPopup = ref(false)
 
 // 导航菜单配置
 const menuItems = ref([
@@ -83,6 +97,28 @@ const currentPage = ref('home')
 // 导航加载状态
 const isNavigating = ref(false)
 const loadingText = ref('加载中...')
+
+// 用户信息计算属性
+const userName = computed(() => {
+	if (userStore.isLogin && userStore.userInfo) {
+		return userStore.userInfo.nickname || userStore.userInfo.username || '用户'
+	}
+	return '未登录'
+})
+
+const userMajor = computed(() => {
+	if (userStore.isLogin) {
+		return userStore.userInfo?.email || '点击登录'
+	}
+	return '点击登录账号'
+})
+
+const userAvatar = computed(() => {
+	if (userStore.isLogin && userStore.userInfo?.avatar) {
+		return userStore.userInfo.avatar
+	}
+	return 'https://java-ai-wrm.oss-cn-beijing.aliyuncs.com/2026/03/26b32fb2-0452-4117-9605-a90087ffb85c.png'
+})
 
 // 加载文字配置
 const loadingTexts = {
@@ -161,9 +197,30 @@ const switchPage = (pageId) => {
 	}
 }
 
+// 点击用户区域
+const handleUserClick = () => {
+	if (userStore.isLogin) {
+		// 已登录，跳转到个人中心
+		switchPage('my')
+	} else {
+		// 未登录，显示登录弹窗
+		showLoginPopup.value = true
+	}
+}
+
+// 登录成功回调
+const handleLoginSuccess = () => {
+	uni.showToast({
+		title: '登录成功',
+		icon: 'success'
+	})
+}
+
 // 组件挂载时同步当前页面状态
 onMounted(() => {
 	currentPage.value = getPageIdFromRoute()
+	// 检查登录状态
+	userStore.checkLogin()
 })
 </script>
 
@@ -497,5 +554,13 @@ $sidebar-width: 400rpx;
 	&:hover {
 		opacity: 1;
 	}
+}
+
+.login-hint {
+	font-size: 26rpx;
+	color: #93c5fd;
+	font-weight: 500;
+	cursor: pointer;
+	flex-shrink: 0;
 }
 </style>
