@@ -22,7 +22,7 @@
 		</view>
 
 		<!-- 身份切换 -->
-		<view class="role-switch">
+		<!-- <view class="role-switch">
 			<view class="role-btn active">
 				<text class="role-icon">🎓</text>
 				<text>学生</text>
@@ -31,7 +31,7 @@
 				<text class="role-icon">👥</text>
 				<text>辅导员</text>
 			</view>
-		</view>
+		</view> -->
 
 		<!-- 导航菜单 -->
 		<view class="nav-menu">
@@ -60,7 +60,7 @@
 					<text class="major">{{ userMajor }}</text>
 				</view>
 			</view>
-			<text class="settings-icon" v-if="userStore.isLogin">⚙</text>
+			<text class="settings-icon" v-if="isLogin">⚙</text>
 			<text class="login-hint" v-else>登录</text>
 		</view>
 
@@ -75,12 +75,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import LoginPopup from '@/components/LoginPopup/LoginPopup.vue'
-import { useUserStore } from '@/stores/user.js'
-
-const userStore = useUserStore()
 
 // 登录弹窗状态
 const showLoginPopup = ref(false)
+
+// 登录状态
+const isLogin = ref(false)
+const userInfo = ref(null)
 
 // 导航菜单配置
 const menuItems = ref([
@@ -100,22 +101,22 @@ const loadingText = ref('加载中...')
 
 // 用户信息计算属性
 const userName = computed(() => {
-	if (userStore.isLogin && userStore.userInfo) {
-		return userStore.userInfo.nickname || userStore.userInfo.username || '用户'
+	if (isLogin.value && userInfo.value) {
+		return userInfo.value.nickname || userInfo.value.username || '用户'
 	}
 	return '未登录'
 })
 
 const userMajor = computed(() => {
-	if (userStore.isLogin) {
-		return userStore.userInfo?.email || '点击登录'
+	if (isLogin.value && userInfo.value) {
+		return userInfo.value.email || '已登录'
 	}
 	return '点击登录账号'
 })
 
 const userAvatar = computed(() => {
-	if (userStore.isLogin && userStore.userInfo?.avatar) {
-		return userStore.userInfo.avatar
+	if (isLogin.value && userInfo.value?.avatar) {
+		return userInfo.value.avatar
 	}
 	return 'https://java-ai-wrm.oss-cn-beijing.aliyuncs.com/2026/03/26b32fb2-0452-4117-9605-a90087ffb85c.png'
 })
@@ -127,6 +128,20 @@ const loadingTexts = {
 	resume: '正在准备简历...',
 	interview: '正在启动面试...',
 	my: '正在加载个人中心...'
+}
+
+// 检查登录状态
+const checkLoginStatus = () => {
+	const token = uni.getStorageSync('token')
+	const storedUserInfo = uni.getStorageSync('userInfo')
+
+	if (token && storedUserInfo) {
+		isLogin.value = true
+		userInfo.value = storedUserInfo
+	} else {
+		isLogin.value = false
+		userInfo.value = null
+	}
 }
 
 // 根据当前路由路径获取页面ID
@@ -199,7 +214,7 @@ const switchPage = (pageId) => {
 
 // 点击用户区域
 const handleUserClick = () => {
-	if (userStore.isLogin) {
+	if (isLogin.value) {
 		// 已登录，跳转到个人中心
 		switchPage('my')
 	} else {
@@ -210,17 +225,15 @@ const handleUserClick = () => {
 
 // 登录成功回调
 const handleLoginSuccess = () => {
-	uni.showToast({
-		title: '登录成功',
-		icon: 'success'
-	})
+	// 重新检查登录状态
+	checkLoginStatus()
 }
 
 // 组件挂载时同步当前页面状态
 onMounted(() => {
 	currentPage.value = getPageIdFromRoute()
 	// 检查登录状态
-	userStore.checkLogin()
+	checkLoginStatus()
 })
 </script>
 

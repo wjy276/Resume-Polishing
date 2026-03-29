@@ -145,8 +145,10 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
-import { useUserStore } from '@/stores/user.js'
+import { ref, watch } from 'vue'
+
+// API 基础地址 - 通过 Vite 代理转发
+const BASE_URL = 'http://81.71.75.85:6008/api'
 
 const props = defineProps({
 	visible: {
@@ -156,8 +158,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:visible', 'success', 'close'])
-
-const userStore = useUserStore()
 
 // 模式：登录/注册
 const isLoginMode = ref(true)
@@ -263,6 +263,198 @@ const validateForm = () => {
 	return !Object.values(errors.value).some(e => e)
 }
 
+/**
+ * 登录接口
+ * POST /api/v1/user/login
+ */
+const loginApi = (data) => {
+	return new Promise((resolve, reject) => {
+		uni.request({
+			url: `${BASE_URL}/v1/user/login`,
+			method: 'POST',
+			data: {
+				username: data.username,
+				password: data.password
+			},
+			header: {
+				'Content-Type': 'application/json'
+			},
+			timeout: 10000, // 30秒超时
+
+			success: (res) => {
+				console.log('登录响应:', res)
+
+				// HTTP 状态码判断
+				if (res.statusCode === 200) {
+					const responseData = res.data
+
+					// 业务状态码判断
+					if (responseData.code === 0 || responseData.code === 200) {
+						resolve({
+							success: true,
+							data: responseData.data,
+							message: '登录成功'
+						})
+					} else {
+						// 业务错误
+						resolve({
+							success: false,
+							message: responseData.message || '登录失败，请检查用户名和密码'
+						})
+					}
+				} else if (res.statusCode === 400) {
+					resolve({
+						success: false,
+						message: '请求参数错误'
+					})
+				} else if (res.statusCode === 401) {
+					resolve({
+						success: false,
+						message: '用户名或密码错误'
+					})
+				} else if (res.statusCode === 500) {
+					resolve({
+						success: false,
+						message: '服务器错误，请稍后重试'
+					})
+				} else {
+					resolve({
+						success: false,
+						message: `请求失败(${res.statusCode})`
+					})
+				}
+			},
+			fail: (err) => {
+				console.error('登录请求失败:', err)
+
+				// 网络错误处理
+				let errorMessage = '网络错误，请检查网络连接'
+				if (err.errMsg) {
+					if (err.errMsg.includes('timeout')) {
+						errorMessage = '请求超时，请稍后重试'
+					} else if (err.errMsg.includes('network')) {
+						errorMessage = '网络连接失败，请检查网络'
+					} else if (err.errMsg.includes('abort')) {
+						errorMessage = '请求已取消'
+					}
+				}
+
+				resolve({
+					success: false,
+					message: errorMessage
+				})
+			}
+		})
+	})
+}
+
+/**
+ * 注册接口
+ * POST /api/v1/user/register
+ */
+const registerApi = (data) => {
+	return new Promise((resolve, reject) => {
+		uni.request({
+			url: `${BASE_URL}/v1/user/register`,
+			method: 'POST',
+			data: {
+				username: data.username,
+				password: data.password,
+				email: data.email,
+				nickname: data.nickname
+			},
+			header: {
+				'Content-Type': 'application/json'
+			},
+			timeout: 15000,
+			success: (res) => {
+				console.log('注册响应:', res)
+
+				// HTTP 状态码判断
+				if (res.statusCode === 200) {
+					const responseData = res.data
+
+					// 业务状态码判断
+					if (responseData.code === 0 || responseData.code === 200) {
+						resolve({
+							success: true,
+							data: responseData.data,
+							message: '注册成功'
+						})
+					} else {
+						// 业务错误
+						resolve({
+							success: false,
+							message: responseData.message || '注册失败，请稍后重试'
+						})
+					}
+				} else if (res.statusCode === 400) {
+					const responseData = res.data
+					resolve({
+						success: false,
+						message: responseData.message || '请求参数错误，请检查输入信息'
+					})
+				} else if (res.statusCode === 409) {
+					resolve({
+						success: false,
+						message: '用户名或邮箱已被注册'
+					})
+				} else if (res.statusCode === 500) {
+					resolve({
+						success: false,
+						message: '服务器错误，请稍后重试'
+					})
+				} else {
+					resolve({
+						success: false,
+						message: `请求失败(${res.statusCode})`
+					})
+				}
+			},
+			fail: (err) => {
+				console.error('注册请求失败:', err)
+
+				// 网络错误处理
+				let errorMessage = '网络错误，请检查网络连接'
+				if (err.errMsg) {
+					if (err.errMsg.includes('timeout')) {
+						errorMessage = '请求超时，请稍后重试'
+					} else if (err.errMsg.includes('network')) {
+						errorMessage = '网络连接失败，请检查网络'
+					} else if (err.errMsg.includes('abort')) {
+						errorMessage = '请求已取消'
+					}
+				}
+
+				resolve({
+					success: false,
+					message: errorMessage
+				})
+			}
+		})
+	})
+}
+
+/**
+ * 保存用户登录信息
+ */
+const saveUserInfo = (data) => {
+	// 保存 token
+	if (data.token) {
+		uni.setStorageSync('token', data.token)
+	}
+
+	// 保存用户信息
+	const userInfo = {
+		userId: data.userId,
+		username: data.username,
+		nickname: data.nickname,
+		avatar: data.avatar,
+		remainingQuota: data.remainingQuota
+	}
+	uni.setStorageSync('userInfo', userInfo)
+}
+
 // 提交处理
 const handleSubmit = async () => {
 	if (!validateForm() || isLoading.value) return
@@ -271,15 +463,16 @@ const handleSubmit = async () => {
 
 	try {
 		let result
+
 		if (isLoginMode.value) {
 			// 登录
-			result = await userStore.login({
+			result = await loginApi({
 				username: form.value.username,
 				password: form.value.password
 			})
 		} else {
 			// 注册
-			result = await userStore.register({
+			result = await registerApi({
 				username: form.value.username,
 				password: form.value.password,
 				email: form.value.email,
@@ -290,8 +483,14 @@ const handleSubmit = async () => {
 		if (result.success) {
 			uni.showToast({
 				title: isLoginMode.value ? '登录成功' : '注册成功',
-				icon: 'success'
+				icon: 'success',
+				duration: 1500
 			})
+
+			// 登录成功保存用户信息
+			if (isLoginMode.value && result.data) {
+				saveUserInfo(result.data)
+			}
 
 			// 记住用户名
 			if (isLoginMode.value && rememberMe.value) {
@@ -301,19 +500,35 @@ const handleSubmit = async () => {
 			emit('success', result.data)
 
 			if (isLoginMode.value) {
-				handleClose()
+				// 延迟关闭弹窗
+				setTimeout(() => {
+					handleClose()
+				}, 500)
 			} else {
 				// 注册成功切换到登录
-				isLoginMode.value = true
-				form.value.password = ''
-				form.value.confirmPassword = ''
+				setTimeout(() => {
+					isLoginMode.value = true
+					form.value.password = ''
+					form.value.confirmPassword = ''
+					uni.showToast({
+						title: '请使用新账号登录',
+						icon: 'none'
+					})
+				}, 1000)
 			}
 		} else {
 			uni.showToast({
 				title: result.message || (isLoginMode.value ? '登录失败' : '注册失败'),
-				icon: 'none'
+				icon: 'none',
+				duration: 2000
 			})
 		}
+	} catch (error) {
+		console.error('提交异常:', error)
+		uni.showToast({
+			title: '操作失败，请稍后重试',
+			icon: 'none'
+		})
 	} finally {
 		isLoading.value = false
 	}
@@ -514,6 +729,7 @@ $primary-light: #3b82f6;
 	flex: 1;
 	height: 84rpx;
 	font-size: 28rpx;
+	color: #365a98;
 }
 
 .toggle-eye {

@@ -320,12 +320,20 @@ const handleSubmit = async () => {
 		let result
 		if (isLoginMode.value) {
 			// 登录
+			console.log('准备登录:', {
+				username: form.value.username,
+				password: '***'
+			})
 			result = await userStore.login({
 				username: form.value.username,
 				password: form.value.password
 			})
 		} else {
 			// 注册
+			console.log('准备注册:', {
+				username: form.value.username,
+				email: form.value.email
+			})
 			result = await userStore.register({
 				username: form.value.username,
 				password: form.value.password,
@@ -363,15 +371,44 @@ const handleSubmit = async () => {
 				}
 			}, 1500)
 		} else {
+			console.error('登录/注册失败:', result.message)
+			console.error('完整错误对象:', result)
+			
+			// 显示更详细的错误信息
+			let errorTitle = result.message || (isLoginMode.value ? '登录失败' : '注册失败')
+			
+			// 如果是 500 错误，显示更友好的提示
+			if (result.message && result.message.includes('500')) {
+				errorTitle = '服务器错误，请稍后重试或联系管理员'
+			}
+			
 			uni.showToast({
-				title: result.message || (isLoginMode.value ? '登录失败' : '注册失败'),
-				icon: 'none'
+				title: errorTitle,
+				icon: 'none',
+				duration: 3000
 			})
 		}
 	} catch (error) {
+		console.error('登录/注册异常:', error)
+		let errorMsg = '网络错误，请检查网络连接'
+		
+		// 更详细的错误信息
+		if (error.message) {
+			if (error.message.includes('timeout')) {
+				errorMsg = '请求超时，请重试'
+			} else if (error.message.includes('ERR_EMPTY_RESPONSE')) {
+				errorMsg = '服务器无响应，请检查后端服务'
+			} else if (error.message.includes('404')) {
+				errorMsg = 'API 接口不存在'
+			} else if (error.message.includes('500')) {
+				errorMsg = '服务器内部错误'
+			}
+		}
+		
 		uni.showToast({
-			title: '网络错误，请重试',
-			icon: 'none'
+			title: errorMsg,
+			icon: 'none',
+			duration: 3000
 		})
 	} finally {
 		isLoading.value = false

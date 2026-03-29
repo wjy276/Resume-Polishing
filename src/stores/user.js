@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 // API 基础地址
-const BASE_URL = 'http://81.71.75.85:8080/api'
+const BASE_URL = 'http://81.71.75.85:6008/api'
 
 export const useUserStore = defineStore('user', () => {
 	// 状态
@@ -20,45 +20,63 @@ export const useUserStore = defineStore('user', () => {
 	 */
 	const login = async (loginForm) => {
 		return new Promise((resolve, reject) => {
+			const url = `${BASE_URL}/v1/user/login`
+			const requestData = {
+				username: loginForm.username,
+				password: loginForm.password
+			}
+
+			console.log('=== 登录请求开始 ===')
+			console.log('请求 URL:', url)
+			console.log('请求数据:', JSON.stringify(requestData))
+
 			uni.request({
-				url: `${BASE_URL}/v1/user/login`,
+				url: url,
 				method: 'POST',
-				data: {
-					username: loginForm.username,
-					password: loginForm.password
-				},
+				data: requestData,
 				header: {
-					'Content-Type': 'application/json'
+					'Content-Type': 'application/json',
+					'Accept': 'application/json'
 				},
+				timeout: 30000,
+				withCredentials: false,
 				success: (res) => {
-					if (res.statusCode === 200 && res.data.code === 0) {
-						const data = res.data.data
-						// 保存 token 和用户信息
-						token.value = data.token
-						userInfo.value = {
-							userId: data.userId,
-							username: data.username,
-							nickname: data.nickname,
-							avatar: data.avatar,
-							remainingQuota: data.remainingQuota
+					console.log('=== 登录响应 ===')
+					console.log('HTTP状态码:', res.statusCode)
+					console.log('响应数据:', res.data)
+
+					// 判断业务状态码
+					const code = res.data?.code
+					const message = res.data?.message || '请求失败'
+
+					if (res.statusCode === 200) {
+						if (code === 0 || code === 200) {
+							// 登录成功
+							const data = res.data.data
+							token.value = data.token
+							userInfo.value = {
+								userId: data.userId,
+								username: data.username,
+								nickname: data.nickname,
+								avatar: data.avatar,
+								remainingQuota: data.remainingQuota
+							}
+							isLogin.value = true
+							uni.setStorageSync('token', data.token)
+							uni.setStorageSync('userInfo', userInfo.value)
+							resolve({ success: true, data })
+						} else {
+							// 业务错误（用户不存在、密码错误等）
+							resolve({ success: false, message })
 						}
-						isLogin.value = true
-
-						// 持久化存储
-						uni.setStorageSync('token', data.token)
-						uni.setStorageSync('userInfo', userInfo.value)
-
-						resolve({ success: true, data })
 					} else {
-						resolve({
-							success: false,
-							message: res.data?.message || '登录失败，请检查用户名和密码'
-						})
+						resolve({ success: false, message: `HTTP错误: ${res.statusCode}` })
 					}
 				},
 				fail: (err) => {
-					console.error('登录请求失败:', err)
-					resolve({ success: false, message: '网络错误，请稍后重试' })
+					console.error('=== 登录请求失败 ===')
+					console.error('错误:', err)
+					resolve({ success: false, message: '网络连接失败' })
 				}
 			})
 		})
@@ -70,32 +88,50 @@ export const useUserStore = defineStore('user', () => {
 	 */
 	const register = async (registerForm) => {
 		return new Promise((resolve, reject) => {
+			const url = `${BASE_URL}/v1/user/register`
+			const requestData = {
+				username: registerForm.username,
+				password: registerForm.password,
+				email: registerForm.email,
+				nickname: registerForm.nickname || registerForm.username
+			}
+
+			console.log('=== 注册请求开始 ===')
+			console.log('请求 URL:', url)
+			console.log('请求数据:', JSON.stringify(requestData))
+
 			uni.request({
-				url: `${BASE_URL}/v1/user/register`,
+				url: url,
 				method: 'POST',
-				data: {
-					username: registerForm.username,
-					password: registerForm.password,
-					email: registerForm.email,
-					nickname: registerForm.nickname || registerForm.username
-				},
+				data: requestData,
 				header: {
-					'Content-Type': 'application/json'
+					'Content-Type': 'application/json',
+					'Accept': 'application/json'
 				},
+				timeout: 30000,
+				withCredentials: false,
 				success: (res) => {
-					if (res.statusCode === 200 && res.data.code === 0) {
-						const data = res.data.data
-						resolve({ success: true, data })
+					console.log('=== 注册响应 ===')
+					console.log('HTTP状态码:', res.statusCode)
+					console.log('响应数据:', res.data)
+
+					const code = res.data?.code
+					const message = res.data?.message || '请求失败'
+
+					if (res.statusCode === 200) {
+						if (code === 0 || code === 200) {
+							resolve({ success: true, data: res.data.data })
+						} else {
+							resolve({ success: false, message })
+						}
 					} else {
-						resolve({
-							success: false,
-							message: res.data?.message || '注册失败，请稍后重试'
-						})
+						resolve({ success: false, message: `HTTP错误: ${res.statusCode}` })
 					}
 				},
 				fail: (err) => {
-					console.error('注册请求失败:', err)
-					resolve({ success: false, message: '网络错误，请稍后重试' })
+					console.error('=== 注册请求失败 ===')
+					console.error('错误:', err)
+					resolve({ success: false, message: '网络连接失败' })
 				}
 			})
 		})

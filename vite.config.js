@@ -9,8 +9,8 @@ export default defineConfig({
     preprocessorOptions: {
       scss: {
         api: 'modern-compiler',
-        silenceDeprecations: ['legacy-js-api'] // 静默旧版 API 警告
+        silenceDeprecations: ['legacy-js-api']
       }
     }
-  },
+  }
 })

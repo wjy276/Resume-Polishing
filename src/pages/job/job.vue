@@ -187,10 +187,13 @@ onMounted(() => {
 })
 
 
+// API 基础地址
+const BASE_URL = 'http://81.71.75.85:6008/api'
+
 // 接口
 const getjobs=()=>{
 	uni.request({
-		url: 'http://81.71.75.85:8080/api/v3/api-docs',
+		url: `${BASE_URL}/v3/api-docs`,
 		method: 'GET',
 		success: (res) => {
 			this.jobList = res.data;
