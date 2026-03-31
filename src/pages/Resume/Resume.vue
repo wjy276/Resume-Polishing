@@ -64,6 +64,12 @@
 import { ref } from 'vue'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
 
+// API 基础地址
+const BASE_URL = 'http://81.71.75.85:6008/api'
+
+// 上传状态
+const uploading = ref(false)
+
 const resumeList = ref([
 	{
 		id: 1,
@@ -87,13 +93,104 @@ const resumeList = ref([
 	}
 ])
 
+// 上传简历到后端
 const uploadResume = () => {
+	// 检查登录状态
+	const token = uni.getStorageSync('token')
+	if (!token) {
+		uni.showToast({
+			title: '请先登录',
+			icon: 'none'
+		})
+		return
+	}
+
 	uni.chooseFile({
 		accept: 'file',
+		extension: ['.pdf', '.doc', '.docx'],
 		success: (res) => {
 			console.log('选择的文件:', res)
-			// 这里可以添加上传逻辑
-			uni.navigateTo({ url: '/pages/Resume/ResumeTemplate' })
+
+			if (res.tempFilePaths && res.tempFilePaths.length > 0) {
+				const filePath = res.tempFilePaths[0]
+				const fileName = res.tempFiles[0]?.name || '简历文件'
+
+				uploading.value = true
+
+				uni.showLoading({
+					title: '正在上传...'
+				})
+
+				uni.uploadFile({
+					url: `${BASE_URL}/v1/resume/upload`,
+					filePath: filePath,
+					name: 'file',
+					header: {
+						'Authorization': "Bearer "+token
+					},
+					formData: {
+						'fileName': fileName
+					},
+					success: (uploadRes) => {
+						uni.hideLoading()
+						uploading.value = false
+
+						console.log('上传结果:', uploadRes)
+
+						if (uploadRes.statusCode === 200) {
+							try {
+								const result = JSON.parse(uploadRes.data)
+
+								if (result.code === 0 && result.data) {
+									// 将返回数据JSON格式化并编码
+									const resumeData = {
+										fileName: fileName,
+										filePath: filePath,
+										...result.data
+									}
+
+									// JSON序列化并Base64编码
+									const jsonStr = JSON.stringify(resumeData)
+									const encodedData = encodeURIComponent(jsonStr)
+
+									// 跳转到模板页面，传递数据
+									uni.navigateTo({
+										url: `/pages/Resume/ResumeTemplate?data=${encodedData}`
+									})
+								} else {
+									uni.showToast({
+										title: result.message || '上传失败',
+										icon: 'none'
+									})
+								}
+							} catch (e) {
+								console.error('解析响应失败:', e)
+								uni.showToast({
+									title: '数据解析失败',
+									icon: 'none'
+								})
+							}
+						} else {
+							uni.showToast({
+								title: '上传失败，请重试',
+								icon: 'none'
+							})
+						}
+					},
+					fail: (err) => {
+						uni.hideLoading()
+						uploading.value = false
+						console.error('上传失败:', err)
+						uni.showToast({
+							title: '网络错误，请稍后重试',
+							icon: 'none'
+						})
+					}
+				})
+			}
+		},
+		fail: (err) => {
+			console.log('选择文件取消或失败:', err)
 		}
 	})
 }

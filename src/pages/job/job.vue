@@ -67,7 +67,7 @@
 
 			<!-- 职位列表 -->
 			<view v-else class="job-list">
-				<view class="job-count">共找到 <text class="count">{{ jobList.length }}</text> 个职位</view>
+				<view class="job-count">共找到 <text class="count">{{ pagination.total }}</text> 个职位</view>
 
 				<view class="job-card" v-for="job in jobList" :key="job.id" @click="viewJob(job)">
 					<view class="job-header">
@@ -125,7 +125,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
-import { generateJobs, searchJobs } from '@/utils/jobDataGenerator.js'
+
+// API 基础地址
+const BASE_URL = 'http://81.71.75.85:6008/api'
 
 // 筛选条件
 const filters = ref({
@@ -141,27 +143,184 @@ const jobList = ref([])
 // 加载状态
 const loading = ref(false)
 
-// 获取职位列表
-const fetchJobs = () => {
+// 分页信息
+const pagination = ref({
+	pageNum: 1,
+	pageSize: 10,
+	total: 0,
+	pages: 0
+})
+
+// 解析薪资范围
+const parseSalaryRange = (salaryStr) => {
+	if (!salaryStr) return { min: null, max: null }
+	const parts = salaryStr.split('-')
+	if (parts.length === 2) {
+		return {
+			min: parseInt(parts[0]) || null,
+			max: parseInt(parts[1]) || null
+		}
+	}
+	return { min: null, max: null }
+}
+
+// 解析技能JSON
+const parseSkills = (skillsStr) => {
+	if (!skillsStr) return []
+	try {
+		return JSON.parse(skillsStr)
+	} catch {
+		return []
+	}
+}
+
+// 解析福利JSON
+const parseBenefits = (benefitsStr) => {
+	if (!benefitsStr) return []
+	try {
+		return JSON.parse(benefitsStr)
+	} catch {
+		return []
+	}
+}
+
+// 转换接口数据为页面数据格式
+const transformJobData = (apiJob) => {
+	return {
+		id: apiJob.positionId,
+		title: apiJob.positionName,
+		salary: apiJob.salaryRange || '面议',
+		company: apiJob.companyName,
+		companyInfo: {
+			scale: apiJob.companyScale || '',
+			industry: apiJob.industry || '',
+			logo: apiJob.companyLogo || '',
+			financingStage: apiJob.financingStage || ''
+		},
+		tags: parseBenefits(apiJob.benefits),
+		skills: parseSkills(apiJob.skills),
+		match: apiJob.matchScore || 0,
+		publishTime: apiJob.publishTime || '',
+		hot: false,
+		hr: {
+			name: '',
+			online: false
+		},
+		source: {
+			name: apiJob.sourceName || '',
+			logo: apiJob.sourceLogo || ''
+		},
+		city: apiJob.cityName || '',
+		experience: apiJob.experienceRequirement || '',
+		education: apiJob.educationRequirement || ''
+	}
+}
+
+// 分页查询职位列表
+const getJobList = () => {
+	// 获取token
+	const token = uni.getStorageSync('token')
+	if (!token) {
+		uni.showToast({
+			title: '请先登录',
+			icon: 'none'
+		})
+		return
+	}
+
 	loading.value = true
 
-	// 模拟网络延迟
-	setTimeout(() => {
-		const searchFilters = {}
-		if (filters.value.keyword) searchFilters.keyword = filters.value.keyword
-		if (filters.value.city) searchFilters.city = filters.value.city
-		if (filters.value.salary) searchFilters.salary = filters.value.salary
+	// 解析薪资范围
+	const salaryRange = parseSalaryRange(filters.value.salary)
 
-		jobList.value = Object.keys(searchFilters).length > 0
-			? searchJobs(searchFilters)
-			: generateJobs(15)
-		loading.value = false
-	}, 500)
+	// 构建请求参数
+	const params = {
+		pageNum: pagination.value.pageNum,
+		pageSize: pagination.value.pageSize
+	}
+	if (filters.value.keyword) params.keyword = filters.value.keyword
+	if (filters.value.industry) params.industry = filters.value.industry
+	if (salaryRange.min !== null) params.salaryMin = salaryRange.min
+	if (salaryRange.max !== null) params.salaryMax = salaryRange.max
+
+	uni.request({
+		url: `${BASE_URL}/v1/position/list`,
+		method: 'GET',
+		header: {
+			'Authorization': 'Bearer ' + token
+		},
+		data: params,
+		success: (res) => {
+			console.log('=== 职位列表响应 [v2] ===')
+			console.log('HTTP状态码:', res.statusCode)
+			console.log('响应code:', res.data?.code, '类型:', typeof res.data?.code)
+			console.log('响应数据:', res.data)
+
+			// 兼容 code 为 0 或 200（数字或字符串）
+			const code = res.data?.code
+			const isSuccess = code === 0 || code === 200 || code === '0' || code === '200'
+
+			console.log('isSuccess:', isSuccess)
+
+			if (res.statusCode === 200 && isSuccess) {
+				const data = res.data.data || {}
+				const records = data.records || []
+
+				console.log('records数量:', records.length)
+
+				// 转换数据
+				jobList.value = records.map(item => ({
+					id: item.positionId,
+					title: item.positionName,
+					salary: item.salaryRange || '面议',
+					company: item.companyName,
+					companyInfo: {
+						scale: item.companyScale || '',
+						industry: item.industry || ''
+					},
+					tags: [],
+					skills: [],
+					match: item.matchScore || 85,
+					publishTime: item.publishTime || '最近',
+					hot: false,
+					hr: { name: '', online: false }
+				}))
+
+				console.log('jobList.value赋值后:', jobList.value)
+				console.log('jobList.value.length:', jobList.value.length)
+
+				pagination.value = {
+					pageNum: data.current || 1,
+					pageSize: data.size || 10,
+					total: data.total || 0,
+					pages: data.pages || 0
+				}
+			} else {
+				console.log('进入else分支, code:', code)
+				uni.showToast({
+					title: res.data?.message || '获取职位列表失败',
+					icon: 'none'
+				})
+			}
+		},
+		fail: (err) => {
+			console.error('获取职位列表失败:', err)
+			uni.showToast({
+				title: '网络错误，请稍后重试',
+				icon: 'none'
+			})
+		},
+		complete: () => {
+			loading.value = false
+			console.log('loading设置为false, jobList.value:', jobList.value)
+		}
+	})
 }
 
 // 搜索职位
 const handleSearch = () => {
-	fetchJobs()
+	pagination.value.pageNum = 1
+	getJobList()
 }
 
 // 重置筛选
@@ -172,37 +331,24 @@ const resetFilters = () => {
 		industry: '',
 		salary: ''
 	}
-	fetchJobs()
+	pagination.value.pageNum = 1
+	getJobList()
 }
 
 // 查看职位详情
 const viewJob = (job) => {
 	console.log('查看职位详情:', job)
-	// 可以跳转到详情页或打开弹窗
+	// 跳转到详情页
+	uni.navigateTo({
+		url: `/pages/JobDetail/JobDetail?id=${job.id}`
+	})
 }
 
 // 初始化
 onMounted(() => {
-	fetchJobs()
+	getJobList()
+	console.log('初始化职位列表',jobList)
 })
-
-
-// API 基础地址
-const BASE_URL = 'http://81.71.75.85:6008/api'
-
-// 接口
-const getjobs=()=>{
-	uni.request({
-		url: `${BASE_URL}/v3/api-docs`,
-		method: 'GET',
-		success: (res) => {
-			this.jobList = res.data;
-		},
-		fail: (err) => {
-			console.log(err);
-		}
-	});
-}
 
 
 </script>
