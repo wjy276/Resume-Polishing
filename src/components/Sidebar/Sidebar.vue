@@ -60,7 +60,7 @@
 					<text class="major">{{ userMajor }}</text>
 				</view>
 			</view>
-			<text class="settings-icon" v-if="isLogin">⚙</text>
+			<text class="settings-icon" v-if="isLogin" @click="handleSettingsClick">⚙</text>
 			<text class="login-hint" v-else>登录</text>
 		</view>
 
@@ -210,6 +210,50 @@ const switchPage = (pageId) => {
 			})
 		}, 150)
 	}
+}
+
+// 点击设置图标
+const handleSettingsClick = (e) => {
+	// 阻止事件冒泡，避免触发 handleUserClick
+	if (e) e.stopPropagation()
+
+	if (!isLogin.value) return
+
+	uni.showActionSheet({
+		itemList: ['退出登录'],
+		success: (res) => {
+			if (res.tapIndex === 0) {
+				// 点击了退出登录
+				uni.showModal({
+					title: '提示',
+					content: '确定要退出登录吗？',
+					confirmText: '确定',
+					cancelText: '取消',
+					success: (modalRes) => {
+						if (modalRes.confirm) {
+							// 清除登录信息
+							uni.removeStorageSync('token')
+							uni.removeStorageSync('userInfo')
+
+							// 更新状态
+							isLogin.value = false
+							userInfo.value = null
+
+							uni.showToast({
+								title: '已退出登录',
+								icon: 'success'
+							})
+
+							// 跳转到首页
+							setTimeout(() => {
+								switchPage('home')
+							}, 500)
+						}
+					}
+				})
+			}
+		}
+	})
 }
 
 // 点击用户区域
