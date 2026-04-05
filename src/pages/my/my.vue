@@ -1,3 +1,6 @@
+<!-- 个人详情页面 -->
+
+
 <template>
 	<view class="my-container">
 		<!-- 侧边栏 -->

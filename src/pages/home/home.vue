@@ -1,3 +1,6 @@
+<!-- 首页模块 -->
+
+
 <template>
 	<view class="home-container">
 		<!-- 侧边栏 -->

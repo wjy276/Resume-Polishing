@@ -1,3 +1,6 @@
+<!-- 简历优化 -->
+<!-- 时间： 2026.4.1-->
+
 <template>
 	<view class="resume-template">
 		<!-- 侧边栏 -->

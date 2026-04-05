@@ -1,3 +1,6 @@
+<!-- 简历优化页面 -->
+
+
 <template>
 	<view class="resume-container">
 		<!-- 侧边栏 -->
