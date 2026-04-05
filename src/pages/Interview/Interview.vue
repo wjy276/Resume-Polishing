@@ -121,6 +121,9 @@ const selectMode = (mode) => {
 const startInterview = () => {
 	console.log('开始面试，模式:', currentMode.value)
 	// 这里可以跳转到面试详情页面
+	uni.navigateTo({
+		url: '/pages/Interview/InterviewTemplate'
+	})
 }
 </script>
 

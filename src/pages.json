@@ -47,6 +47,12 @@
 			"style": {
 				"navigationBarTitleText": "ResumeTemplate"
 			}
+		},
+		{
+			"path": "pages/Interview/InterviewTemplate",
+			"style": {
+				"navigationBarTitleText": "InterviewTemplate"
+			}
 		}
 	],
 	"window": {

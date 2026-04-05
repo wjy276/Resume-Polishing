@@ -79,6 +79,14 @@
                     "secure" : false
                 }
             }
-        }
+        },
+        
+          "permissions":{
+            "scope.record":{
+                "desc":"需要麦克风权限",
+                "deniedTips":"你拒绝了麦克风权限，无法使用语音输入功能"
+            }
+          }
+        
     }
 }
