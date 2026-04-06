@@ -55,21 +55,27 @@
 
 			<!-- 语音输入区域 -->
 			<view class="voice-input-section">
-				<!-- 识别中的文本预览 -->
-				<view v-if="recognizedText" class="recognized-text-preview">
-					<text class="preview-label">识别结果：</text>
-					<text class="preview-text">{{ recognizedText }}</text>
-					<view class="preview-actions">
-						<view class="action-btn send-btn" @click="sendRecognizedText">
-							<text class="action-icon">✓</text>
-							<text class="action-text">发送</text>
-						</view>
-						<view class="action-btn cancel-btn" @click="clearRecognizedText">
-							<text class="action-icon">✕</text>
-							<text class="action-text">清除</text>
+				<!-- 文本输入区域 -->
+				<!-- <view class="text-input-area">
+					<textarea
+						class="answer-input"
+						v-model="recognizedText"
+						placeholder="请输入您的回答..."
+						:maxlength="500"
+						auto-height
+					></textarea>
+					<view class="input-actions">
+						<text class="char-count">{{ recognizedText.length }}/500</text>
+						<view class="input-btns">
+							<view class="action-btn cancel-btn" @click="clearRecognizedText" v-if="recognizedText">
+								<text class="action-text">清除</text>
+							</view>
+							<view class="action-btn send-btn" @click="sendRecognizedText">
+								<text class="action-text">发送</text>
+							</view>
 						</view>
 					</view>
-				</view>
+				</view> -->
 
 				<view class="voice-hint">
 					<text class="mic-icon">🎤</text>
@@ -88,7 +94,7 @@
 				</view>
 
 				<text class="voice-tip">
-					提示：点击麦克风说话，识别完成后点击发送按钮提交回答
+					提示：点击麦克风录音并保存音频文件，或在上方输入框直接输入回答
 				</text>
 			</view>
 		</view>
@@ -97,7 +103,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { onShow, onHide } from '@dcloudio/uni-app'
+import { onShow, onHide, onLoad } from '@dcloudio/uni-app'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
 import { request } from '@/stores/user.js'
 
@@ -109,20 +115,25 @@ const recognizedText = ref('')
 const isSpeaking = ref(false) // 语音播放状态
 const isInitialized = ref(false) // 是否已初始化
 
+// API 基础地址
+const BASE_URL = 'http://81.71.75.85:6008/api'
+
 // 消息列表
 const messages = ref([])
 const chatContainer = ref(null)
 
-// 语音识别实例
-let recognition = null
+// 录音相关
+let mediaRecorder = null
+let audioChunks = []
 let currentUtterance = null // 当前播放的语音实例
+let recordingStartTime = 0 // 录音开始时间
 
 // 计算属性
 const voiceHintText = computed(() => {
-	if (isRecording.value) return '正在聆听，请说话...'
+	if (isRecording.value) return '正在录音...'
 	if (isAIThinking.value) return '面试官正在思考...'
 	if (isSpeaking.value) return '面试官正在说话...'
-	return '点击麦克风开始说话'
+	return '点击麦克风开始录音'
 })
 
 const canReplay = computed(() => {
@@ -160,153 +171,417 @@ const scrollToBottom = () => {
 // 停止所有语音
 const stopAllSpeech = () => {
 	if (window.speechSynthesis) {
+		// 先移除事件监听，避免触发 interrupted 错误
+		if (currentUtterance) {
+			currentUtterance.onend = null
+			currentUtterance.onerror = null
+		}
 		window.speechSynthesis.cancel()
 	}
 	isSpeaking.value = false
 	currentUtterance = null
 }
 
-// 初始化语音识别
-const initSpeechRecognition = () => {
-	// 检查浏览器支持
-	const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-
-	if (!SpeechRecognition) {
-		uni.showToast({
-			title: '当前浏览器不支持语音识别',
-			icon: 'none'
+// 开始录音
+const startRecording = async () => {
+	try {
+		// 请求麦克风权限
+		const stream = await navigator.mediaDevices.getUserMedia({
+			audio: {
+				sampleRate: 16000, // 降低采样率，提高兼容性
+				channelCount: 1,
+				echoCancellation: true,
+				noiseSuppression: true
+			}
 		})
-		return false
-	}
 
-	recognition = new SpeechRecognition()
+		// 确定支持的音频格式 - 根据服务端支持的格式优先选择
+		// 服务端支持：mp3、wav、m4a、aac、ogg、flac、webm、amr
+		let mimeType = 'audio/webm'
+		let extension = 'webm'
 
-	// 配置参数
-	recognition.lang = 'zh-CN'
-	recognition.continuous = false
-	recognition.interimResults = true
-	recognition.maxAlternatives = 1
+		// 优先尝试 m4a/mp4 格式（iOS/Safari 兼容性好，服务端也支持）
+		if (MediaRecorder.isTypeSupported('audio/mp4')) {
+			mimeType = 'audio/mp4'
+			extension = 'm4a'
+		} else if (MediaRecorder.isTypeSupported('audio/mp4;codecs="aac"')) {
+			mimeType = 'audio/mp4;codecs="aac"'
+			extension = 'm4a'
+		} else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+			mimeType = 'audio/webm;codecs=opus'
+			extension = 'webm'
+		} else if (MediaRecorder.isTypeSupported('audio/webm')) {
+			mimeType = 'audio/webm'
+			extension = 'webm'
+		} else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+			mimeType = 'audio/ogg;codecs=opus'
+			extension = 'ogg'
+		} else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+			mimeType = 'audio/ogg'
+			extension = 'ogg'
+		}
 
-	// 开始识别
-	recognition.onstart = () => {
-		console.log('语音识别开始')
-		isRecording.value = true
-		recognizedText.value = ''
-	}
+		console.log('录音格式检测:')
+		console.log('  - 选定 MIME 类型:', mimeType)
+		console.log('  - 文件扩展名:', extension)
+		console.log('  - webm 支持:', MediaRecorder.isTypeSupported('audio/webm'))
+		console.log('  - mp4 支持:', MediaRecorder.isTypeSupported('audio/mp4'))
+		console.log('  - ogg 支持:', MediaRecorder.isTypeSupported('audio/ogg'))
 
-	// 识别结果
-	recognition.onresult = (event) => {
-		let finalTranscript = ''
-		let interimTranscript = ''
+		console.log('使用音频格式:', mimeType, '扩展名:', extension)
 
-		for (let i = event.resultIndex; i < event.results.length; i++) {
-			const transcript = event.results[i][0].transcript
-			if (event.results[i].isFinal) {
-				finalTranscript += transcript
-			} else {
-				interimTranscript += transcript
+		// 创建 MediaRecorder
+		mediaRecorder = new MediaRecorder(stream, { mimeType })
+
+		audioChunks = []
+		recordingStartTime = Date.now()
+
+		mediaRecorder.ondataavailable = (event) => {
+			if (event.data.size > 0) {
+				audioChunks.push(event.data)
 			}
 		}
 
-		// 显示识别结果在预览区域（不自动发送）
-		if (finalTranscript) {
-			console.log('最终识别结果：', finalTranscript)
-			recognizedText.value = finalTranscript
-		} else if (interimTranscript) {
-			recognizedText.value = interimTranscript
-		}
-	}
-
-	// 识别错误
-	recognition.onerror = (event) => {
-		console.error('识别错误：', event.error)
-		isRecording.value = false
-
-		// 不显示网络错误提示，因为可能是暂时的
-		if (event.error === 'network') {
-			console.warn('语音识别网络错误，可能是暂时的')
-			// 尝试重新初始化
-			setTimeout(() => {
-				initSpeechRecognition()
-			}, 500)
-			return
+		mediaRecorder.onstop = () => {
+			saveRecording(extension, mimeType)
 		}
 
-		let errorMsg = '语音识别出错'
-		switch (event.error) {
-			case 'no-speech':
-				errorMsg = '未检测到语音，请重试'
-				break
-			case 'audio-capture':
-				errorMsg = '无法访问麦克风'
-				break
-			case 'not-allowed':
-				errorMsg = '麦克风权限被拒绝，请在浏览器设置中允许'
-				break
-			case 'aborted':
-				// 用户主动取消，不显示错误
-				return
+		mediaRecorder.onerror = (event) => {
+			console.error('录音错误：', event)
+			isRecording.value = false
+			uni.showToast({
+				title: '录音出错，请重试',
+				icon: 'none'
+			})
+		}
+
+		// 开始录音
+		mediaRecorder.start(1000) // 每秒收集一次数据
+		isRecording.value = true
+
+		console.log('录音开始')
+
+	} catch (error) {
+		console.error('启动录音失败：', error)
+
+		let errorMsg = '启动录音失败'
+		if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+			errorMsg = '请允许访问麦克风'
+		} else if (error.name === 'NotFoundError') {
+			errorMsg = '未找到麦克风设备'
 		}
 
 		uni.showToast({
 			title: errorMsg,
 			icon: 'none'
 		})
-
-		recognizedText.value = ''
 	}
+}
 
-	// 识别结束
-	recognition.onend = () => {
-		console.log('语音识别结束')
+// 停止录音
+const stopRecording = () => {
+	if (mediaRecorder && isRecording.value) {
+		mediaRecorder.stop()
+		mediaRecorder.stream.getTracks().forEach(track => track.stop())
 		isRecording.value = false
+		console.log('录音结束')
+	}
+}
 
-		// 延迟清空识别文本
-		setTimeout(() => {
-			recognizedText.value = ''
-		}, 500)
+// 保存录音并上传到后端
+const saveRecording = async (extension = 'webm', mimeType = 'audio/webm') => {
+	if (audioChunks.length === 0) {
+		uni.showToast({
+			title: '录音数据为空',
+			icon: 'none'
+		})
+		return
 	}
 
-	return true
+	uni.showLoading({
+		title: '上传中...',
+		mask: true
+	})
+
+	try {
+		// 计算录音时长
+		const duration = Math.round((Date.now() - recordingStartTime) / 1000)
+		const timestamp = Date.now()
+		const fileName = `interview_${timestamp}.${extension}`
+
+		// 合并音频数据
+		const audioBlob = new Blob(audioChunks, { type: mimeType })
+		const audioSize = audioBlob.size
+
+		console.log('=== 录音上传详情 ===')
+		console.log('文件名:', fileName)
+		console.log('文件大小:', `${(audioSize / 1024).toFixed(2)} KB`)
+		console.log('录音时长:', `${duration}秒`)
+		console.log('MIME类型:', mimeType)
+		console.log('数据块数量:', audioChunks.length)
+
+		// 获取会话ID和token
+		const sessionId = uni.getStorageSync('sessionId')
+		const token = uni.getStorageSync('token')
+
+		console.log('sessionId:', sessionId)
+		console.log('token存在:', !!token)
+
+		if (!sessionId) {
+			throw new Error('面试会话不存在，请重新开始面试')
+		}
+
+		if (!token) {
+			throw new Error('请先登录')
+		}
+
+		// 使用 XMLHttpRequest 上传（更好的兼容性）
+		// 接口路径: /api/v1/mock-interview/session/{sessionId}/message
+		const uploadUrl = `${BASE_URL}/v1/mock-interview/session/${sessionId}/message`
+		console.log('上传URL:', uploadUrl)
+
+		const result = await new Promise((resolve, reject) => {
+			const xhr = new XMLHttpRequest()
+
+			xhr.open('POST', uploadUrl, true)
+			xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+			// 注意：不要手动设置 Content-Type，让浏览器自动设置 multipart/form-data 的 boundary
+
+			// 监听上传进度
+			xhr.upload.onprogress = function(e) {
+				if (e.lengthComputable) {
+					const percent = Math.round((e.loaded / e.total) * 100)
+					console.log('上传进度:', percent + '%')
+				}
+			}
+
+			xhr.onload = function() {
+				console.log('XHR状态:', xhr.status)
+				console.log('XHR响应:', xhr.responseText)
+
+				if (xhr.status >= 200 && xhr.status < 300) {
+					try {
+						const data = JSON.parse(xhr.responseText)
+						resolve(data)
+					} catch (e) {
+						reject(new Error('响应解析失败: ' + xhr.responseText))
+					}
+				} else {
+					try {
+						const errorData = JSON.parse(xhr.responseText)
+						reject(new Error(errorData.message || `服务器错误: ${xhr.status}`))
+					} catch (e) {
+						reject(new Error(`服务器错误: ${xhr.status}`))
+					}
+				}
+			}
+
+			xhr.onerror = function(e) {
+				console.error('XHR网络错误:', e)
+				reject(new Error('网络错误，请检查网络连接'))
+			}
+
+			xhr.ontimeout = function() {
+				reject(new Error('请求超时，请重试'))
+			}
+
+			xhr.timeout = 120000 // 120秒超时，因为需要等待AI处理
+
+			// 构建 FormData
+			const formData = new FormData()
+
+			// 根据文件扩展名确定正确的 MIME 类型
+			let uploadMimeType = mimeType
+			if (extension === 'webm') {
+				uploadMimeType = 'audio/webm'
+			} else if (extension === 'm4a') {
+				uploadMimeType = 'audio/mp4'
+			} else if (extension === 'ogg') {
+				uploadMimeType = 'audio/ogg'
+			}
+
+			// 创建带有正确 MIME 类型的 File 对象
+			const audioFile = new File([audioBlob], fileName, { type: uploadMimeType })
+
+			console.log('准备上传文件:')
+			console.log('  - 文件名:', fileName)
+			console.log('  - 文件大小:', (audioFile.size / 1024).toFixed(2), 'KB')
+			console.log('  - MIME类型:', audioFile.type)
+			console.log('  - 扩展名:', extension)
+
+			// 接口文档要求 file 字段
+			formData.append('file', audioFile)
+
+			// 打印 FormData 内容（调试用）
+			console.log('FormData 已构建，准备发送请求...')
+
+			xhr.send(formData)
+		})
+
+		console.log('录音上传结果：', result)
+
+			// 根据接口文档处理不同状态码
+			if (result.code === 0 || result.code === 200) {
+				const { data } = result
+
+				// 根据接口文档解析响应数据
+				// data.userMessage: 用户消息 { messageId, sessionId, role, audioUrl, audioFileName, createTime }
+				// data.assistantMessage: AI回复消息 { messageId, sessionId, role, audioUrl, createTime }
+				const userMessage = data?.userMessage
+				const assistantMessage = data?.assistantMessage
+
+				// 添加用户消息到列表（显示音频文件名或时间）
+				if (userMessage) {
+					addMessage('candidate', userMessage.audioFileName || '语音消息')
+				}
+
+				// 处理AI回复
+				if (assistantMessage) {
+					// 判断 audioUrl 是真正的音频URL还是文本内容
+					// 如果是文本内容（包含中文字符或较长），则使用语音合成
+					const audioUrl = assistantMessage.audioUrl
+					const isTextContent = audioUrl && (
+						audioUrl.length > 50 ||
+						/[\u4e00-\u9fa5]/.test(audioUrl) || // 包含中文
+						!audioUrl.startsWith('/')
+					)
+
+					if (isTextContent) {
+						// audioUrl 实际上是文本内容
+						const textContent = audioUrl
+						addMessage('interviewer', textContent)
+						// 使用浏览器语音合成播放
+						speakMessage(textContent)
+					} else if (audioUrl) {
+						// audioUrl 是真正的音频URL
+						addMessage('interviewer', '正在播放回复...')
+						// 构建完整的音频URL
+						const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `${BASE_URL}${audioUrl}`
+						playAudioFromUrl(fullAudioUrl)
+					} else {
+						addMessage('interviewer', 'AI回复已生成')
+					}
+				}
+
+				uni.showToast({
+					title: `上传成功 (${duration}秒)`,
+					icon: 'success'
+				})
+
+			} else {
+				// 根据接口文档处理不同错误状态码
+				let errorMsg = result.message || '上传失败'
+
+				// HTTP状态码对应的错误信息
+				if (result.code === 400) {
+					errorMsg = result.message || '参数错误（文件为空、格式不支持或会话已结束）'
+				} else if (result.code === 401) {
+					errorMsg = '未登录，请先登录'
+					// 可以跳转到登录页
+					setTimeout(() => {
+						uni.navigateTo({ url: '/pages/login/login' })
+					}, 1500)
+				} else if (result.code === 403) {
+					errorMsg = '无权访问此会话'
+				} else if (result.code === 404) {
+					errorMsg = '会话不存在，请重新开始面试'
+					// 清除无效的sessionId
+					uni.removeStorageSync('sessionId')
+				} else if (result.code === 500) {
+					errorMsg = result.message || '服务器内部错误，请稍后重试'
+				}
+
+				throw new Error(errorMsg)
+			}
+
+	} catch (error) {
+		console.error('=== 上传录音失败 ===')
+		console.error('错误信息:', error.message)
+
+		// 显示错误提示，并提供文字输入选项
+		uni.showModal({
+			title: '语音上传失败',
+			content: `${error.message}\n\n您可以使用文字输入继续面试`,
+			showCancel: true,
+			cancelText: '取消',
+			confirmText: '文字输入',
+			success: (res) => {
+				if (res.confirm) {
+					// 用户选择使用文字输入，聚焦到输入框
+					const input = document.querySelector('.answer-input')
+					if (input) {
+						input.focus()
+					}
+				}
+			}
+		})
+	} finally {
+		uni.hideLoading()
+		audioChunks = []
+	}
+}
+
+// 播放远程音频
+const playAudioFromUrl = (url) => {
+	if (!url) return
+
+	try {
+		const audio = new Audio(url)
+		audio.onplay = () => {
+			isSpeaking.value = true
+			// 更新AI消息状态为正在播放
+			const lastMsg = messages.value[messages.value.length - 1]
+			if (lastMsg && lastMsg.role === 'interviewer') {
+				lastMsg.content = '正在播放回复...'
+			}
+			console.log('AI音频播放开始')
+		}
+		audio.onended = () => {
+			isSpeaking.value = false
+			// 更新AI消息状态为已完成
+			const lastMsg = messages.value[messages.value.length - 1]
+			if (lastMsg && lastMsg.role === 'interviewer') {
+				lastMsg.content = '语音回复已完成'
+			}
+			console.log('AI音频播放结束')
+		}
+		audio.onerror = (e) => {
+			console.error('音频播放错误：', e)
+			isSpeaking.value = false
+			// 更新AI消息状态为错误
+			const lastMsg = messages.value[messages.value.length - 1]
+			if (lastMsg && lastMsg.role === 'interviewer') {
+				lastMsg.content = '音频播放失败'
+			}
+		}
+		audio.play()
+	} catch (error) {
+		console.error('播放音频失败：', error)
+	}
 }
 
 // 切换录音状态
 const toggleRecording = async () => {
 	if (isAIThinking.value) return
 
-	// 每次点击都重新初始化识别实例，避免网络错误累积
-	if (recognition) {
-		try {
-			recognition.stop()
-		} catch (e) {}
-		recognition = null
+	// 如果正在录音，停止录音
+	if (isRecording.value) {
+		stopRecording()
+		return
 	}
-
-	const initialized = initSpeechRecognition()
-	if (!initialized) return
 
 	// 开始录音前，先停止正在播放的语音
 	stopAllSpeech()
 
-	// 短暂延迟后启动
-	setTimeout(() => {
-		try {
-			recognition?.start()
-		} catch (e) {
-			console.error('启动录音失败：', e)
-			uni.showToast({
-				title: '启动语音识别失败，请重试',
-				icon: 'none'
-			})
-		}
-	}, 100)
+	// 开始录音
+	await startRecording()
 }
 
 // 发送识别的文本
 const sendRecognizedText = () => {
 	if (!recognizedText.value.trim()) {
 		uni.showToast({
-			title: '请先进行语音输入',
+			title: '请先输入内容',
 			icon: 'none'
 		})
 		return
@@ -342,6 +617,8 @@ const handleUserResponse = async (text) => {
 // 发送消息给面试官（后端AI）
 const sendToInterviewer = async (userMessage) => {
 	isAIThinking.value = true
+	const sessionId = uni.getStorageSync('sessionId')
+	const token = uni.getStorageSync('token')
 
 	try {
 		// 构建对话历史
@@ -352,7 +629,7 @@ const sendToInterviewer = async (userMessage) => {
 
 		// 调用后端 API
 		const response = await request({
-			url: '/v1/interview/chat',
+			url: `/v1/mock-interview/session/${sessionId}/message`,
 			method: 'POST',
 			data: {
 				message: userMessage,
@@ -407,6 +684,8 @@ const speakMessage = (text) => {
 	// 先停止之前的播报
 	stopAllSpeech()
 
+	console.log('准备语音播报:', text.substring(0, 50) + '...')
+
 	const utterance = new SpeechSynthesisUtterance(text)
 	currentUtterance = utterance
 
@@ -418,9 +697,18 @@ const speakMessage = (text) => {
 
 	// 尝试获取中文语音
 	const voices = window.speechSynthesis.getVoices()
-	const chineseVoice = voices.find(voice => voice.lang.includes('zh'))
+	console.log('可用语音数量:', voices.length)
+
+	// 优先选择高质量的中文语音
+	const chineseVoice = voices.find(voice =>
+		voice.lang.includes('zh-CN') || voice.lang.includes('zh')
+	) || voices.find(voice => voice.lang.includes('zh'))
+
 	if (chineseVoice) {
 		utterance.voice = chineseVoice
+		console.log('使用语音:', chineseVoice.name, chineseVoice.lang)
+	} else {
+		console.warn('未找到中文语音，使用默认语音')
 	}
 
 	utterance.onstart = () => {
@@ -435,12 +723,20 @@ const speakMessage = (text) => {
 	}
 
 	utterance.onerror = (event) => {
-		console.error('语音播放错误：', event.error)
+		// interrupted 是正常的中断，不算错误
+		if (event.error === 'interrupted' || event.error === 'canceled') {
+			console.log('语音播放被中断')
+		} else {
+			console.error('语音播放错误：', event.error)
+		}
 		isSpeaking.value = false
 		currentUtterance = null
 	}
 
-	window.speechSynthesis.speak(utterance)
+	// 某些浏览器需要延迟调用
+	setTimeout(() => {
+		window.speechSynthesis.speak(utterance)
+	}, 100)
 }
 
 // 重播最后一条面试官消息
@@ -462,24 +758,30 @@ const endInterview = () => {
 			if (res.confirm) {
 				// 停止所有语音和录音
 				stopAllSpeech()
-				if (recognition) {
+				if (mediaRecorder && isRecording.value) {
 					try {
-						recognition.stop()
+						mediaRecorder.stop()
+						mediaRecorder.stream?.getTracks().forEach(track => track.stop())
 					} catch (e) {}
 				}
 
 				// 保存面试记录
-				try {
-					await request({
-						url: '/v1/interview/end',
-						method: 'POST',
-						data: {
-							messages: messages.value,
-							endTime: new Date().toISOString()
-						}
-					})
-				} catch (e) {
-					console.error('保存面试记录失败：', e)
+				const sessionId = uni.getStorageSync('sessionId')
+				if (sessionId) {
+					try {
+						await request({
+							url: `/v1/mock-interview/session/${sessionId}/end`,
+							method: 'POST',
+							data: {
+								messages: messages.value,
+								endTime: new Date().toISOString()
+							}
+						})
+						// 清除 sessionId
+						uni.removeStorageSync('sessionId')
+					} catch (e) {
+						console.error('保存面试记录失败：', e)
+					}
 				}
 
 				isInterviewActive.value = false
@@ -505,14 +807,20 @@ const initInterview = async () => {
 	const defaultWelcome = '你好呀！我是负责本次HR面试的面试官小周，很高兴能有机会和你沟通。先简单和你打个招呼，也请你放松下来，咱们今天的交流更像是一场轻松的专业探讨。接下来我想先问第一个问题：能不能和我聊聊你未来3-5年的职业规划？'
 
 	try {
+		const sessionId = uni.getStorageSync('sessionId')
+
+		if (!sessionId) {
+			console.warn('sessionId 不存在，使用默认开场白')
+			addMessage('interviewer', defaultWelcome)
+			speakMessage(defaultWelcome)
+			return
+		}
+
 		// 调用后端获取开场白
 		console.log('请求面试开场白...')
 		const response = await request({
-			url: '/v1/interview/start',
-			method: 'POST',
-			data: {
-				interviewType: 'hr'
-			}
+			url: `/v1/mock-interview/session/${sessionId}/start`,
+			method: 'POST'
 		})
 
 		console.log('面试开场白响应：', response)
@@ -548,11 +856,12 @@ const resetAllState = () => {
 
 	// 停止所有语音和录音
 	stopAllSpeech()
-	if (recognition) {
+	if (mediaRecorder) {
 		try {
-			recognition.stop()
+			mediaRecorder.stop()
+			mediaRecorder.stream?.getTracks().forEach(track => track.stop())
 		} catch (e) {}
-		recognition = null
+		mediaRecorder = null
 	}
 
 	// 重置状态变量
@@ -570,11 +879,18 @@ const resetAllState = () => {
 const preloadVoices = () => {
 	if (window.speechSynthesis) {
 		// 某些浏览器需要先调用 getVoices() 才能正常使用语音合成
-		window.speechSynthesis.getVoices()
+		const voices = window.speechSynthesis.getVoices()
+		console.log('预加载语音，当前可用:', voices.length, '个')
 
 		// 监听语音列表变化
 		window.speechSynthesis.onvoiceschanged = () => {
-			window.speechSynthesis.getVoices()
+			const newVoices = window.speechSynthesis.getVoices()
+			console.log('语音列表更新，当前可用:', newVoices.length, '个')
+			// 打印可用的中文语音
+			const chineseVoices = newVoices.filter(v => v.lang.includes('zh'))
+			if (chineseVoices.length > 0) {
+				console.log('可用中文语音:', chineseVoices.map(v => v.name).join(', '))
+			}
 		}
 	}
 }
@@ -602,12 +918,70 @@ onShow(() => {
 onHide(() => {
 	console.log('=== onHide: 页面隐藏 ===')
 	stopAllSpeech()
-	if (recognition) {
+	if (mediaRecorder && isRecording.value) {
 		try {
-			recognition.stop()
+			mediaRecorder.stop()
+			mediaRecorder.stream?.getTracks().forEach(track => track.stop())
 		} catch (e) {}
 	}
 })
+
+// 创建面试会话
+const createInterview = async () => {
+	const token = uni.getStorageSync('token')
+
+	try {
+		const response = await request({
+			url: '/v1/mock-interview/session',
+			method: 'POST',
+			data: {
+				interviewType: 'hr'
+			}
+		})
+
+		console.log('创建面试成功：', response)
+
+		// 保存 sessionId
+		if (response.code === 0 || response.code === 200) {
+			const sessionId = response.data?.sessionId || response.sessionId
+			if (sessionId) {
+				uni.setStorageSync('sessionId', sessionId)
+				console.log('sessionId 已保存：', sessionId)
+			}
+		}
+	} catch (err) {
+		console.error('创建面试失败：', err)
+	}
+}
+
+
+// 获取面试消息历史
+const setMessages = async () => {
+	const sessionId = uni.getStorageSync('sessionId')
+
+	if (!sessionId) {
+		console.warn('sessionId 不存在，无法获取消息')
+		return
+	}
+
+	try {
+		const response = await request({
+			url: `/v1/mock-interview/session/${sessionId}/message`,
+			method: 'GET'
+		})
+
+		console.log('获取面试消息成功：', response)
+
+		if (response.code === 0 || response.code === 200) {
+			const messageList = response.data || response
+			if (Array.isArray(messageList)) {
+				messages.value = messageList
+			}
+		}
+	} catch (err) {
+		console.error('获取面试消息失败：', err)
+	}
+}
 
 onMounted(() => {
 	console.log('=== onMounted: 面试页面挂载 ===')
@@ -618,14 +992,16 @@ onMounted(() => {
 	// 首次加载时初始化面试
 	resetAllState()
 	initInterview()
+	createInterview()
 
 	// 监听页面可见性变化
 	document.addEventListener('visibilitychange', () => {
 		if (document.hidden) {
 			stopAllSpeech()
-			if (recognition) {
+			if (mediaRecorder && isRecording.value) {
 				try {
-					recognition.stop()
+					mediaRecorder.stop()
+					mediaRecorder.stream?.getTracks().forEach(track => track.stop())
 				} catch (e) {}
 			}
 		}
@@ -643,16 +1019,23 @@ onUnmounted(() => {
 	// 停止所有语音
 	stopAllSpeech()
 
-	// 停止语音识别
-	if (recognition) {
+	// 停止录音
+	if (mediaRecorder) {
 		try {
-			recognition.stop()
+			mediaRecorder.stop()
+			mediaRecorder.stream?.getTracks().forEach(track => track.stop())
 		} catch (e) {}
+		mediaRecorder = null
 	}
 
 	// 移除事件监听
 	document.removeEventListener('visibilitychange', () => {})
 	window.removeEventListener('beforeunload', () => {})
+})
+
+onLoad(() => {
+	console.log('=== onLoad: 面试页面加载 ===')
+	createInterview()
 })
 </script>
 
@@ -903,34 +1286,48 @@ onUnmounted(() => {
 	margin: 0 64rpx 64rpx;
 }
 
-.recognized-text-preview {
-	background: #f0f9ff;
-	border: 1px solid #bae6fd;
-	border-radius: 16rpx;
-	padding: 24rpx 32rpx;
+// 文本输入区域
+.text-input-area {
 	width: 100%;
 	max-width: 800rpx;
+	background: #f9fafb;
+	border: 2rpx solid #e5e7eb;
+	border-radius: 16rpx;
+	padding: 24rpx;
 }
 
-.preview-label {
-	font-size: 26rpx;
-	color: #0284c7;
-	font-weight: 500;
-}
-
-.preview-text {
+.answer-input {
+	width: 100%;
+	min-height: 120rpx;
 	font-size: 30rpx;
-	color: #0369a1;
-	line-height: 1.5;
-	display: block;
-	margin-bottom: 20rpx;
+	color: #374151;
+	line-height: 1.6;
+	background: transparent;
+	border: none;
+	resize: none;
+
+	&::placeholder {
+		color: #9ca3af;
+	}
 }
 
-.preview-actions {
+.input-actions {
 	display: flex;
-	gap: 24rpx;
-	justify-content: flex-end;
+	justify-content: space-between;
+	align-items: center;
 	margin-top: 16rpx;
+	padding-top: 16rpx;
+	border-top: 1px solid #e5e7eb;
+}
+
+.char-count {
+	font-size: 24rpx;
+	color: #9ca3af;
+}
+
+.input-btns {
+	display: flex;
+	gap: 16rpx;
 }
 
 .action-btn {
@@ -961,12 +1358,9 @@ onUnmounted(() => {
 	}
 }
 
-.action-icon {
-	font-size: 28rpx;
-}
-
 .action-text {
 	font-size: 26rpx;
+	font-weight: 500;
 }
 
 .voice-hint {
