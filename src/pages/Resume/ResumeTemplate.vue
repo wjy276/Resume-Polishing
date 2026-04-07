@@ -47,120 +47,152 @@
 			</view>
 
 			<!-- 简历模块网格 -->
-			<view v-if="!isLoading && hasData" class="modules-grid">
-				<!-- 个人介绍 -->
-				<view class="module-card">
-					<view class="card-header">
-						<view class="header-left">
-							<view class="icon-box">
-								<text class="module-icon">👤</text>
+			<view v-if="!isLoading && hasData" class="content-wrapper">
+				<!-- 左侧：模块优化 -->
+				<view class="modules-section">
+					<view class="modules-grid">
+						<!-- 个人介绍 -->
+						<view class="module-card">
+							<view class="card-header">
+								<view class="header-left">
+									<view class="icon-box">
+										<text class="module-icon">👤</text>
+									</view>
+									<text class="module-title">个人介绍</text>
+								</view>
+								<view class="ai-optimize" :class="{ disabled: optimizingModules.personal }" @click="handleOptimize('personal')">
+									<text class="sparkle-icon">✨</text>
+									<text class="optimize-text">{{ optimizingModules.personal ? '优化中...' : 'AI 优化' }}</text>
+								</view>
 							</view>
-							<text class="module-title">个人介绍</text>
+							<view class="card-content">
+								<view class="content-box">
+									<view v-if="resumeData.Person_original" class="content-item">
+										<text class="content-label">原始内容：</text>
+										<text class="content-text">{{ resumeData.Person_original }}</text>
+									</view>
+									<view v-if="optimizedData.personal" class="content-item optimized">
+										<text class="content-label optimized-label">优化内容：</text>
+										<text class="content-text">{{ optimizedData.personal }}</text>
+									</view>
+									<text v-if="!resumeData.Person_original && !optimizedData.personal" class="no-content">无</text>
+								</view>
+							</view>
 						</view>
-						<view class="ai-optimize" :class="{ disabled: optimizingModules.personal }" @click="handleOptimize('personal')">
-							<text class="sparkle-icon">✨</text>
-							<text class="optimize-text">{{ optimizingModules.personal ? '优化中...' : 'AI 优化' }}</text>
+
+						<!-- 教育背景 -->
+						<view class="module-card">
+							<view class="card-header">
+								<view class="header-left">
+									<view class="icon-box">
+										<text class="module-icon">🎓</text>
+									</view>
+									<text class="module-title">教育背景</text>
+								</view>
+								<view class="ai-optimize" :class="{ disabled: optimizingModules.education }" @click="handleOptimize('education')">
+									<text class="sparkle-icon">✨</text>
+									<text class="optimize-text">{{ optimizingModules.education ? '优化中...' : 'AI 优化' }}</text>
+								</view>
+							</view>
+							<view class="card-content">
+								<view class="content-box">
+									<view v-if="resumeData.Educational_original" class="content-item">
+										<text class="content-label">原始内容：</text>
+										<text class="content-text">{{ resumeData.Educational_original }}</text>
+									</view>
+									<view v-if="optimizedData.education" class="content-item optimized">
+										<text class="content-label optimized-label">优化内容：</text>
+										<text class="content-text">{{ optimizedData.education }}</text>
+									</view>
+									<text v-if="!resumeData.Educational_original && !optimizedData.education" class="no-content">无</text>
+								</view>
+							</view>
 						</view>
-					</view>
-					<view class="card-content">
-						<view class="content-box">
-							<view v-if="resumeData.Person_original" class="content-item">
-								<text class="content-label">原始内容：</text>
-								<text class="content-text">{{ resumeData.Person_original }}</text>
+
+						<!-- 工作经历 -->
+						<view class="module-card">
+							<view class="card-header">
+								<view class="header-left">
+									<view class="icon-box">
+										<text class="module-icon">💼</text>
+									</view>
+									<text class="module-title">工作经历</text>
+								</view>
+								<view class="ai-optimize" :class="{ disabled: optimizingModules.work }" @click="handleOptimize('work')">
+									<text class="sparkle-icon">✨</text>
+									<text class="optimize-text">{{ optimizingModules.work ? '优化中...' : 'AI 优化' }}</text>
+								</view>
 							</view>
-							<view v-if="optimizedData.personal" class="content-item optimized">
-								<text class="content-label optimized-label">优化内容：</text>
-								<text class="content-text">{{ optimizedData.personal }}</text>
+							<view class="card-content">
+								<view class="content-box">
+									<view v-if="resumeData.Work_original && resumeData.Work_original !== '无原始信息'" class="content-item">
+										<text class="content-label">原始内容：</text>
+										<text class="content-text">{{ resumeData.Work_original }}</text>
+									</view>
+									<view v-if="optimizedData.work" class="content-item optimized">
+										<text class="content-label optimized-label">优化内容：</text>
+										<text class="content-text">{{ optimizedData.work }}</text>
+									</view>
+									<text v-if="(!resumeData.Work_original || resumeData.Work_original === '无原始信息') && !optimizedData.work" class="no-content">无</text>
+								</view>
 							</view>
-							<text v-if="!resumeData.Person_original && !optimizedData.personal" class="no-content">无</text>
+						</view>
+
+						<!-- 项目经验 -->
+						<view class="module-card">
+							<view class="card-header">
+								<view class="header-left">
+									<view class="icon-box">
+										<text class="module-icon">📦</text>
+									</view>
+									<text class="module-title">项目经验</text>
+								</view>
+								<view class="ai-optimize" :class="{ disabled: optimizingModules.project }" @click="handleOptimize('project')">
+									<text class="sparkle-icon">✨</text>
+									<text class="optimize-text">{{ optimizingModules.project ? '优化中...' : 'AI 优化' }}</text>
+								</view>
+							</view>
+							<view class="card-content">
+								<view class="content-box">
+									<view v-if="resumeData.Project_original" class="content-item">
+										<text class="content-label">原始内容：</text>
+										<text class="content-text">{{ resumeData.Project_original }}</text>
+									</view>
+									<view v-if="optimizedData.project" class="content-item optimized">
+										<text class="content-label optimized-label">优化内容：</text>
+										<text class="content-text">{{ optimizedData.project }}</text>
+									</view>
+									<text v-if="!resumeData.Project_original && !optimizedData.project" class="no-content">无</text>
+								</view>
+							</view>
 						</view>
 					</view>
 				</view>
 
-				<!-- 教育背景 -->
-				<view class="module-card">
-					<view class="card-header">
-						<view class="header-left">
-							<view class="icon-box">
-								<text class="module-icon">🎓</text>
-							</view>
-							<text class="module-title">教育背景</text>
-						</view>
-						<view class="ai-optimize" :class="{ disabled: optimizingModules.education }" @click="handleOptimize('education')">
-							<text class="sparkle-icon">✨</text>
-							<text class="optimize-text">{{ optimizingModules.education ? '优化中...' : 'AI 优化' }}</text>
-						</view>
-					</view>
-					<view class="card-content">
-						<view class="content-box">
-							<view v-if="resumeData.Educational_original" class="content-item">
-								<text class="content-label">原始内容：</text>
-								<text class="content-text">{{ resumeData.Educational_original }}</text>
-							</view>
-							<view v-if="optimizedData.education" class="content-item optimized">
-								<text class="content-label optimized-label">优化内容：</text>
-								<text class="content-text">{{ optimizedData.education }}</text>
-							</view>
-							<text v-if="!resumeData.Educational_original && !optimizedData.education" class="no-content">无</text>
-						</view>
-					</view>
-				</view>
+				<!-- 右侧：模板选择和预览 -->
+				<view class="preview-section">
+					<!-- 模板选择器 -->
+					<TemplateSelector
+						v-model="selectedTemplate"
+						@preview="handlePreview"
+						@export="handleExportPDF"
+					/>
 
-				<!-- 工作经历 -->
-				<view class="module-card">
-					<view class="card-header">
-						<view class="header-left">
-							<view class="icon-box">
-								<text class="module-icon">💼</text>
+					<!-- 简历预览 -->
+					<view class="preview-container">
+						<view class="preview-header">
+							<text class="preview-title">简历预览</text>
+							<view class="preview-actions">
+								<view class="action-btn small" @click="handlePreview">
+									<text class="btn-icon">👁️</text>
+									<text class="btn-text">全屏预览</text>
+								</view>
 							</view>
-							<text class="module-title">工作经历</text>
 						</view>
-						<view class="ai-optimize" :class="{ disabled: optimizingModules.work }" @click="handleOptimize('work')">
-							<text class="sparkle-icon">✨</text>
-							<text class="optimize-text">{{ optimizingModules.work ? '优化中...' : 'AI 优化' }}</text>
-						</view>
-					</view>
-					<view class="card-content">
-						<view class="content-box">
-							<view v-if="resumeData.Work_original && resumeData.Work_original !== '无原始信息'" class="content-item">
-								<text class="content-label">原始内容：</text>
-								<text class="content-text">{{ resumeData.Work_original }}</text>
-							</view>
-							<view v-if="optimizedData.work" class="content-item optimized">
-								<text class="content-label optimized-label">优化内容：</text>
-								<text class="content-text">{{ optimizedData.work }}</text>
-							</view>
-							<text v-if="(!resumeData.Work_original || resumeData.Work_original === '无原始信息') && !optimizedData.work" class="no-content">无</text>
-						</view>
-					</view>
-				</view>
-
-				<!-- 项目经验 -->
-				<view class="module-card">
-					<view class="card-header">
-						<view class="header-left">
-							<view class="icon-box">
-								<text class="module-icon">📦</text>
-							</view>
-							<text class="module-title">项目经验</text>
-						</view>
-						<view class="ai-optimize" :class="{ disabled: optimizingModules.project }" @click="handleOptimize('project')">
-							<text class="sparkle-icon">✨</text>
-							<text class="optimize-text">{{ optimizingModules.project ? '优化中...' : 'AI 优化' }}</text>
-						</view>
-					</view>
-					<view class="card-content">
-						<view class="content-box">
-							<view v-if="resumeData.Project_original" class="content-item">
-								<text class="content-label">原始内容：</text>
-								<text class="content-text">{{ resumeData.Project_original }}</text>
-							</view>
-							<view v-if="optimizedData.project" class="content-item optimized">
-								<text class="content-label optimized-label">优化内容：</text>
-								<text class="content-text">{{ optimizedData.project }}</text>
-							</view>
-							<text v-if="!resumeData.Project_original && !optimizedData.project" class="no-content">无</text>
-						</view>
+						<ResumePreview
+							:resume="transformedResumeData"
+							:template="selectedTemplate"
+						/>
 					</view>
 				</view>
 			</view>
@@ -169,7 +201,7 @@
 			<view v-if="hasData" class="footer-actions">
 				<view class="footer-left">
 					<view class="action-btn" @click="handleExportPDF">
-						<text class="btn-icon">⬇️</text>
+						<text class="btn-icon">📄</text>
 						<text class="btn-text">导出 PDF</text>
 					</view>
 					<view class="action-btn save-btn" @click="handleSaveVersion">
@@ -187,12 +219,45 @@
 				</view>
 			</view>
 		</view>
+
+		<!-- 全屏预览弹窗 -->
+		<view v-if="showPreviewModal" class="preview-modal" @click.self="closePreviewModal">
+			<view class="modal-content">
+				<view class="modal-header">
+					<text class="modal-title">简历预览</text>
+					<view class="modal-actions">
+						<view class="modal-btn" @click="handleExportPDF">
+							<text class="btn-icon">📄</text>
+							<text class="btn-text">导出 PDF</text>
+						</view>
+						<view class="modal-btn close-btn" @click="closePreviewModal">
+							<text class="btn-text">关闭</text>
+						</view>
+					</view>
+				</view>
+				<view class="modal-body">
+					<ResumePreview
+						:resume="transformedResumeData"
+						:template="selectedTemplate"
+					/>
+				</view>
+			</view>
+		</view>
 	</view>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
+import { TemplateSelector, ResumePreview } from '@/components/ResumeTemplates'
+import { transformBackendData, templateTypes } from '@/utils/resumeData.js'
+import { exportResumeToPDF, previewResumePrint } from '@/utils/resumeExport.js'
+
+// 选中的模板
+const selectedTemplate = ref(templateTypes.SIMPLE)
+
+// 预览弹窗
+const showPreviewModal = ref(false)
 
 // 简历原始数据
 const resumeData = ref({
@@ -235,6 +300,17 @@ const hasData = computed(() => {
 		resumeData.value.Educational_original ||
 		resumeData.value.Work_original ||
 		resumeData.value.Project_original
+})
+
+// 转换后的简历数据（用于模板渲染）
+const transformedResumeData = computed(() => {
+	return transformBackendData({
+		...resumeData.value,
+		Personal_Introduction: optimizedData.value.personal || resumeData.value.Personal_Introduction || resumeData.value.Person_original,
+		Educational_Background: optimizedData.value.education || resumeData.value.Educational_Background || resumeData.value.Educational_original,
+		Work_Experience: optimizedData.value.work || resumeData.value.Work_Experience || resumeData.value.Work_original,
+		Project_Experience: optimizedData.value.project || resumeData.value.Project_Experience || resumeData.value.Project_original
+	})
 })
 
 // 优化进度
@@ -347,11 +423,21 @@ const handleOptimizeAll = async () => {
 	uni.hideLoading()
 }
 
+// 预览简历
+const handlePreview = () => {
+	showPreviewModal.value = true
+}
+
+// 关闭预览弹窗
+const closePreviewModal = () => {
+	showPreviewModal.value = false
+}
+
 // 导出 PDF
 const handleExportPDF = () => {
-	uni.showToast({
-		title: '导出功能开发中',
-		icon: 'none'
+	exportResumeToPDF({
+		fileName: resumeData.value.fileName ? resumeData.value.fileName.replace(/\.[^.]+$/, '') : '简历',
+		template: selectedTemplate.value
 	})
 }
 
@@ -367,6 +453,7 @@ const handleSaveVersion = () => {
 			project: resumeData.value.Project_original
 		},
 		optimized: optimizedData.value,
+		template: selectedTemplate.value,
 		saveTime: new Date().toISOString()
 	}
 
@@ -584,59 +671,20 @@ onMounted(() => {
 	color: #6b7280;
 }
 
-// 加载状态
-.loading-container {
+// 内容区域
+.content-wrapper {
 	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	padding: 120rpx 48rpx;
 	gap: 32rpx;
+	padding: 32rpx 48rpx;
 }
 
-.loading-spinner {
-	width: 64rpx;
-	height: 64rpx;
-	border: 4rpx solid #e5e7eb;
-	border-top-color: #3b82f6;
-	border-radius: 50%;
-	animation: spin 1s linear infinite;
+.modules-section {
+	flex: 1;
 }
 
-@keyframes spin {
-	to {
-		transform: rotate(360deg);
-	}
-}
-
-.loading-text {
-	font-size: 28rpx;
-	color: #6b7280;
-}
-
-// 无数据提示
-.no-data-container {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	padding: 120rpx 48rpx;
-	gap: 24rpx;
-}
-
-.no-data-icon {
-	font-size: 80rpx;
-}
-
-.no-data-text {
-	font-size: 32rpx;
-	color: #374151;
-	font-weight: 500;
-}
-
-.no-data-hint {
-	font-size: 28rpx;
-	color: #9ca3af;
+.preview-section {
+	width: 480rpx;
+	flex-shrink: 0;
 }
 
 // 简历模块网格
@@ -644,7 +692,6 @@ onMounted(() => {
 	display: grid;
 	grid-template-columns: repeat(2, 1fr);
 	gap: 32rpx;
-	padding: 32rpx 48rpx 48rpx;
 }
 
 .module-card {
@@ -770,6 +817,51 @@ onMounted(() => {
 	font-style: italic;
 }
 
+// 预览区域
+.preview-container {
+	background: #ffffff;
+	border-radius: 24rpx;
+	overflow: hidden;
+	box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
+}
+
+.preview-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 24rpx;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.preview-title {
+	font-size: 28rpx;
+	font-weight: 600;
+	color: #1a1a1a;
+}
+
+.preview-actions {
+	display: flex;
+	gap: 16rpx;
+}
+
+.action-btn.small {
+	padding: 12rpx 20rpx;
+	background: #f3f4f6;
+	border-radius: 8rpx;
+	display: flex;
+	align-items: center;
+	gap: 8rpx;
+
+	.btn-icon {
+		font-size: 24rpx;
+	}
+
+	.btn-text {
+		font-size: 22rpx;
+		color: #374151;
+	}
+}
+
 // 底部操作区
 .footer-actions {
 	display: flex;
@@ -870,6 +962,155 @@ onMounted(() => {
 
 	.sparkle-icon {
 		font-size: 32rpx;
+	}
+}
+
+// 预览弹窗
+.preview-modal {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 1000;
+}
+
+.modal-content {
+	width: 90%;
+	max-width: 900px;
+	max-height: 90vh;
+	background: #ffffff;
+	border-radius: 24rpx;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+.modal-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 24rpx 32rpx;
+	border-bottom: 1px solid #e5e7eb;
+	background: #f9fafb;
+}
+
+.modal-title {
+	font-size: 32rpx;
+	font-weight: 600;
+	color: #1a1a1a;
+}
+
+.modal-actions {
+	display: flex;
+	gap: 16rpx;
+}
+
+.modal-btn {
+	display: flex;
+	align-items: center;
+	gap: 8rpx;
+	padding: 12rpx 24rpx;
+	background: #3b82f6;
+	border-radius: 8rpx;
+	cursor: pointer;
+
+	.btn-icon {
+		font-size: 24rpx;
+	}
+
+	.btn-text {
+		font-size: 24rpx;
+		color: #ffffff;
+		font-weight: 500;
+	}
+
+	&.close-btn {
+		background: #f3f4f6;
+
+		.btn-text {
+			color: #374151;
+		}
+	}
+}
+
+.modal-body {
+	flex: 1;
+	overflow-y: auto;
+	padding: 32rpx;
+}
+
+// 加载状态
+.loading-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 120rpx 48rpx;
+	gap: 32rpx;
+}
+
+.loading-spinner {
+	width: 64rpx;
+	height: 64rpx;
+	border: 4rpx solid #e5e7eb;
+	border-top-color: #3b82f6;
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.loading-text {
+	font-size: 28rpx;
+	color: #6b7280;
+}
+
+// 无数据提示
+.no-data-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 120rpx 48rpx;
+	gap: 24rpx;
+}
+
+.no-data-icon {
+	font-size: 80rpx;
+}
+
+.no-data-text {
+	font-size: 32rpx;
+	color: #374151;
+	font-weight: 500;
+}
+
+.no-data-hint {
+	font-size: 28rpx;
+	color: #9ca3af;
+}
+
+// 响应式
+@media (max-width: 1200px) {
+	.content-wrapper {
+		flex-direction: column;
+	}
+
+	.preview-section {
+		width: 100%;
+	}
+
+	.modules-grid {
+		grid-template-columns: 1fr;
 	}
 }
 </style>

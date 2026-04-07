@@ -1,53 +1,14 @@
-<template>
-	<view class="app-container">
-		<slot />
-	</view>
-</template>
+/**
+ * 全局打印样式
+ * 用于简历PDF导出
+ */
 
-<script setup>
-// App.vue 只作为全局容器，不处理业务逻辑
-console.log('App.vue 已加载')
-</script>
-
-<style lang="scss">
-/* 全局样式 */
-page {
-	height: 100%;
-	margin: 0;
-	padding: 0;
-	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
-
-.app-container {
-	height: 100vh;
-	width: 100vw;
-	overflow: hidden;
-}
-
-/* 滚动条美化 */
-::-webkit-scrollbar {
-	width: 6px;
-}
-
-::-webkit-scrollbar-track {
-	background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-	background: #cbd5e1;
-	border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-	background: #94a3b8;
-}
-
-/* ========== 全局打印样式 ========== */
+/* ========== 打印时隐藏非简历内容 ========== */
 @media print {
 	/* 隐藏侧边栏 */
 	.sidebar,
 	.sidebar-container,
-	[class*="Sidebar"],
+	[class*="sidebar"],
 	aside {
 		display: none !important;
 	}
@@ -87,6 +48,12 @@ page {
 		display: none !important;
 	}
 
+	/* 隐藏预览弹窗背景 */
+	.preview-modal {
+		position: static !important;
+		background: none !important;
+	}
+
 	/* 隐藏所有按钮 */
 	button,
 	.action-btn,
@@ -94,8 +61,7 @@ page {
 	.export-btn,
 	.save-btn,
 	.re-upload-btn,
-	.ai-optimize,
-	.optimize-all-btn {
+	.ai-optimize {
 		display: none !important;
 	}
 
@@ -113,16 +79,9 @@ page {
 		display: none !important;
 	}
 
-	/* 隐藏预览弹窗背景 */
-	.preview-modal {
-		position: static !important;
-		background: none !important;
-	}
-
-	/* 隐藏弹窗头部和按钮 */
-	.modal-header,
-	.modal-actions,
-	.modal-btn {
+	/* 隐藏"优化内容"标签 */
+	.optimized-label,
+	.content-label.optimized-label {
 		display: none !important;
 	}
 
@@ -256,7 +215,7 @@ page {
 	}
 }
 
-/* ========== 打印预览模式 ========== */
+/* ========== 打印预览模式（屏幕显示打印效果） ========== */
 body.printing {
 	background: #f0f0f0 !important;
 }
@@ -278,4 +237,3 @@ body.printing .preview-section {
 	max-width: 800px !important;
 	margin: 20px auto !important;
 }
-</style>
