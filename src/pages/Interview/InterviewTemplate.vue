@@ -298,227 +298,30 @@ const saveRecording = async (extension = 'webm', mimeType = 'audio/webm') => {
 		return
 	}
 
-	uni.showLoading({
-		title: '上传中...',
-		mask: true
+	// 计算录音时长
+	const duration = Math.round((Date.now() - recordingStartTime) / 1000)
+
+	// 显示用户消息（语音消息）
+	addMessage('candidate', `语音消息 (${duration}秒)`)
+
+	uni.hideLoading()
+	audioChunks = []
+
+	uni.showToast({
+		title: `录音成功 (${duration}秒)`,
+		icon: 'success'
 	})
 
-	try {
-		// 计算录音时长
-		const duration = Math.round((Date.now() - recordingStartTime) / 1000)
-		const timestamp = Date.now()
-		const fileName = `interview_${timestamp}.${extension}`
+	// 直接获取下一个问题
+	isAIThinking.value = true
 
-		// 合并音频数据
-		const audioBlob = new Blob(audioChunks, { type: mimeType })
-		const audioSize = audioBlob.size
-
-		console.log('=== 录音上传详情 ===')
-		console.log('文件名:', fileName)
-		console.log('文件大小:', `${(audioSize / 1024).toFixed(2)} KB`)
-		console.log('录音时长:', `${duration}秒`)
-		console.log('MIME类型:', mimeType)
-		console.log('数据块数量:', audioChunks.length)
-
-		// 获取会话ID和token
-		const sessionId = uni.getStorageSync('sessionId')
-		const token = uni.getStorageSync('token')
-
-		console.log('sessionId:', sessionId)
-		console.log('token存在:', !!token)
-
-		if (!sessionId) {
-			throw new Error('面试会话不存在，请重新开始面试')
-		}
-
-		if (!token) {
-			throw new Error('请先登录')
-		}
-
-		// 使用 XMLHttpRequest 上传（更好的兼容性）
-		// 接口路径: /api/v1/mock-interview/session/{sessionId}/message
-		const uploadUrl = `${BASE_URL}/v1/mock-interview/session/${sessionId}/message`
-		console.log('上传URL:', uploadUrl)
-
-		const result = await new Promise((resolve, reject) => {
-			const xhr = new XMLHttpRequest()
-
-			xhr.open('POST', uploadUrl, true)
-			xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-			// 注意：不要手动设置 Content-Type，让浏览器自动设置 multipart/form-data 的 boundary
-
-			// 监听上传进度
-			xhr.upload.onprogress = function(e) {
-				if (e.lengthComputable) {
-					const percent = Math.round((e.loaded / e.total) * 100)
-					console.log('上传进度:', percent + '%')
-				}
-			}
-
-			xhr.onload = function() {
-				console.log('XHR状态:', xhr.status)
-				console.log('XHR响应:', xhr.responseText)
-
-				if (xhr.status >= 200 && xhr.status < 300) {
-					try {
-						const data = JSON.parse(xhr.responseText)
-						resolve(data)
-					} catch (e) {
-						reject(new Error('响应解析失败: ' + xhr.responseText))
-					}
-				} else {
-					try {
-						const errorData = JSON.parse(xhr.responseText)
-						reject(new Error(errorData.message || `服务器错误: ${xhr.status}`))
-					} catch (e) {
-						reject(new Error(`服务器错误: ${xhr.status}`))
-					}
-				}
-			}
-
-			xhr.onerror = function(e) {
-				console.error('XHR网络错误:', e)
-				reject(new Error('网络错误，请检查网络连接'))
-			}
-
-			xhr.ontimeout = function() {
-				reject(new Error('请求超时，请重试'))
-			}
-
-			xhr.timeout = 120000 // 120秒超时，因为需要等待AI处理
-
-			// 构建 FormData
-			const formData = new FormData()
-
-			// 根据文件扩展名确定正确的 MIME 类型
-			let uploadMimeType = mimeType
-			if (extension === 'webm') {
-				uploadMimeType = 'audio/webm'
-			} else if (extension === 'm4a') {
-				uploadMimeType = 'audio/mp4'
-			} else if (extension === 'ogg') {
-				uploadMimeType = 'audio/ogg'
-			}
-
-			// 创建带有正确 MIME 类型的 File 对象
-			const audioFile = new File([audioBlob], fileName, { type: uploadMimeType })
-
-			console.log('准备上传文件:')
-			console.log('  - 文件名:', fileName)
-			console.log('  - 文件大小:', (audioFile.size / 1024).toFixed(2), 'KB')
-			console.log('  - MIME类型:', audioFile.type)
-			console.log('  - 扩展名:', extension)
-
-			// 接口文档要求 file 字段
-			formData.append('file', audioFile)
-
-			// 打印 FormData 内容（调试用）
-			console.log('FormData 已构建，准备发送请求...')
-
-			xhr.send(formData)
-		})
-
-		console.log('录音上传结果：', result)
-
-			// 根据接口文档处理不同状态码
-			if (result.code === 0 || result.code === 200) {
-				const { data } = result
-
-				// 根据接口文档解析响应数据
-				// data.userMessage: 用户消息 { messageId, sessionId, role, audioUrl, audioFileName, createTime }
-				// data.assistantMessage: AI回复消息 { messageId, sessionId, role, audioUrl, createTime }
-				const userMessage = data?.userMessage
-				const assistantMessage = data?.assistantMessage
-
-				// 添加用户消息到列表（显示音频文件名或时间）
-				if (userMessage) {
-					addMessage('candidate', userMessage.audioFileName || '语音消息')
-				}
-
-				// 处理AI回复
-				if (assistantMessage) {
-					// 判断 audioUrl 是真正的音频URL还是文本内容
-					// 如果是文本内容（包含中文字符或较长），则使用语音合成
-					const audioUrl = assistantMessage.audioUrl
-					const isTextContent = audioUrl && (
-						audioUrl.length > 50 ||
-						/[\u4e00-\u9fa5]/.test(audioUrl) || // 包含中文
-						!audioUrl.startsWith('/')
-					)
-
-					if (isTextContent) {
-						// audioUrl 实际上是文本内容
-						const textContent = audioUrl
-						addMessage('interviewer', textContent)
-						// 使用浏览器语音合成播放
-						speakMessage(textContent)
-					} else if (audioUrl) {
-						// audioUrl 是真正的音频URL
-						addMessage('interviewer', '正在播放回复...')
-						// 构建完整的音频URL
-						const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `${BASE_URL}${audioUrl}`
-						playAudioFromUrl(fullAudioUrl)
-					} else {
-						addMessage('interviewer', 'AI回复已生成')
-					}
-				}
-
-				uni.showToast({
-					title: `上传成功 (${duration}秒)`,
-					icon: 'success'
-				})
-
-			} else {
-				// 根据接口文档处理不同错误状态码
-				let errorMsg = result.message || '上传失败'
-
-				// HTTP状态码对应的错误信息
-				if (result.code === 400) {
-					errorMsg = result.message || '参数错误（文件为空、格式不支持或会话已结束）'
-				} else if (result.code === 401) {
-					errorMsg = '未登录，请先登录'
-					// 可以跳转到登录页
-					setTimeout(() => {
-						uni.navigateTo({ url: '/pages/login/login' })
-					}, 1500)
-				} else if (result.code === 403) {
-					errorMsg = '无权访问此会话'
-				} else if (result.code === 404) {
-					errorMsg = '会话不存在，请重新开始面试'
-					// 清除无效的sessionId
-					uni.removeStorageSync('sessionId')
-				} else if (result.code === 500) {
-					errorMsg = result.message || '服务器内部错误，请稍后重试'
-				}
-
-				throw new Error(errorMsg)
-			}
-
-	} catch (error) {
-		console.error('=== 上传录音失败 ===')
-		console.error('错误信息:', error.message)
-
-		// 显示错误提示，并提供文字输入选项
-		uni.showModal({
-			title: '语音上传失败',
-			content: `${error.message}\n\n您可以使用文字输入继续面试`,
-			showCancel: true,
-			cancelText: '取消',
-			confirmText: '文字输入',
-			success: (res) => {
-				if (res.confirm) {
-					// 用户选择使用文字输入，聚焦到输入框
-					const input = document.querySelector('.answer-input')
-					if (input) {
-						input.focus()
-					}
-				}
-			}
-		})
-	} finally {
-		uni.hideLoading()
-		audioChunks = []
-	}
+	setTimeout(() => {
+		// 获取下一个面试问题
+		const nextQuestion = getFallbackResponse('')
+		addMessage('interviewer', nextQuestion)
+		speakMessage(nextQuestion)
+		isAIThinking.value = false
+	}, 800)
 }
 
 // 播放远程音频
@@ -662,17 +465,97 @@ const sendToInterviewer = async (userMessage) => {
 	}
 }
 
-// 模拟回复（后端接口未就绪时使用）
+// 当前面试问题索引
+const currentQuestionIndex = ref(0)
+
+// 前端开发工程师面试问题列表（写死）
+const frontendInterviewQuestions = [
+	{
+		id: 1,
+		question: '你好！我是今天的面试官，很高兴能和你交流。首先，请简单介绍一下你自己，包括你的技术背景和项目经验。',
+		followUp: '好的，感谢你的介绍。'
+	},
+	{
+		id: 2,
+		question: '你提到你有前端开发经验，能详细说说你最熟悉的前端技术栈吗？比如 Vue、React 或者其他框架？',
+		followUp: '很好，看来你对这个技术栈有比较深入的了解。'
+	},
+	{
+		id: 3,
+		question: '请解释一下什么是闭包？在 JavaScript 中闭包有哪些应用场景？能否举一个实际的例子？',
+		followUp: '解释得很清楚，闭包确实是 JavaScript 中非常重要的概念。'
+	},
+	{
+		id: 4,
+		question: '说说 Vue 的响应式原理是什么？Vue 2 和 Vue 3 的响应式实现有什么区别？',
+		followUp: '对 Vue 的响应式原理理解得很到位。'
+	},
+	{
+		id: 5,
+		question: '什么是虚拟 DOM？它有什么优势？Vue 和 React 的虚拟 DOM 有什么区别？',
+		followUp: '很好的回答，虚拟 DOM 确实是现代前端框架的核心技术之一。'
+	},
+	{
+		id: 6,
+		question: '请解释一下 CSS 盒模型。标准盒模型和怪异盒模型有什么区别？如何设置？',
+		followUp: '对盒模型的理解很准确。'
+	},
+	{
+		id: 7,
+		question: '你了解哪些前端性能优化方案？请从加载优化、渲染优化、代码优化等方面谈谈你的经验。',
+		followUp: '性能优化是前端开发中非常重要的一环，你的回答很全面。'
+	},
+	{
+		id: 8,
+		question: '请解释一下浏览器的事件循环机制。宏任务和微任务有什么区别？',
+		followUp: '事件循环是 JavaScript 异步编程的核心，理解得很透彻。'
+	},
+	{
+		id: 9,
+		question: '你如何处理跨域问题？有哪些常见的解决方案？CORS 的原理是什么？',
+		followUp: '跨域是前端开发中常见的问题，你的解决方案很实用。'
+	},
+	{
+		id: 10,
+		question: '请描述一下你做过的一个前端项目，包括技术选型、遇到的挑战以及你是如何解决的。',
+		followUp: '感谢你的分享，项目经验很丰富。'
+	},
+	{
+		id: 11,
+		question: '你了解前端安全吗？常见的 XSS 和 CSRF 攻击是什么？如何防范？',
+		followUp: '前端安全意识很重要，你的回答很专业。'
+	},
+	{
+		id: 12,
+		question: '最后，你有什么问题想问我的吗？关于团队、技术栈或者工作内容都可以。',
+		followUp: '感谢你的提问，今天的面试就到这里，我们会尽快给你反馈。'
+	}
+]
+
+// 模拟回复（后端接口未就绪时使用）- 前端开发工程师面试
 const getFallbackResponse = (userMessage) => {
-	const responses = [
-		'感谢您的回答，能否详细说说您在这个项目中的具体贡献？',
-		'听起来很有意思，您在这个过程中遇到过什么挑战吗？',
-		'很好，接下来我想了解一下您的团队合作经验，您能分享一个例子吗？',
-		'您提到的技能很全面，您觉得您最大的优势是什么？',
-		'感谢您的分享，您对我们公司和这个职位有什么想了解的吗？'
-	]
-	return responses[Math.floor(Math.random() * responses.length)]
+	// 获取下一个问题
+	const nextIndex = currentQuestionIndex.value
+
+	if (nextIndex < frontendInterviewQuestions.length) {
+		const questionData = frontendInterviewQuestions[nextIndex]
+		currentQuestionIndex.value++
+
+		// 如果不是第一个问题，先给出反馈再提问
+		if (nextIndex > 0) {
+			const prevQuestion = frontendInterviewQuestions[nextIndex - 1]
+			return `${prevQuestion.followUp}\n\n${questionData.question}`
+		}
+
+		return questionData.question
+	}
+
+	// 所有问题都问完了
+	return '感谢你今天的参与！我们的面试环节已经结束了。你表现得很好，我们会综合评估后尽快给你反馈。祝你求职顺利！'
 }
+
+// 默认开场白
+const defaultWelcome = frontendInterviewQuestions[0].question
 
 // 语音播报
 const speakMessage = (text) => {
@@ -803,8 +686,8 @@ const endInterview = () => {
 const initInterview = async () => {
 	console.log('=== 开始初始化面试 ===')
 
-	// 默认开场白
-	const defaultWelcome = '你好呀！我是负责本次HR面试的面试官小周，很高兴能有机会和你沟通。先简单和你打个招呼，也请你放松下来，咱们今天的交流更像是一场轻松的专业探讨。接下来我想先问第一个问题：能不能和我聊聊你未来3-5年的职业规划？'
+	// 重置问题索引
+	currentQuestionIndex.value = 0
 
 	try {
 		const sessionId = uni.getStorageSync('sessionId')
@@ -870,6 +753,9 @@ const resetAllState = () => {
 	isAIThinking.value = false
 	recognizedText.value = ''
 	isSpeaking.value = false
+
+	// 重置问题索引
+	currentQuestionIndex.value = 0
 
 	// 清空消息列表
 	messages.value = []

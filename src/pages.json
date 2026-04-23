@@ -53,6 +53,18 @@
 			"style": {
 				"navigationBarTitleText": "InterviewTemplate"
 			}
+		},
+		{
+			"path": "pages/Job/JobItem",
+			"style": {
+				"navigationBarTitleText": "JobItem"
+			}
+		},
+		{
+			"path": "pages/Resume/ResumeTemplateChooce",
+			"style": {
+				"navigationBarTitleText": "ResumeTemplateChooce"
+			}
 		}
 	],
 	"window": {

@@ -341,9 +341,9 @@ const resetFilters = () => {
 // 查看职位详情
 const viewJob = (job) => {
 	console.log('查看职位详情:', job)
-	// 跳转到详情页
+	// 跳转到详情页，传递 positionId
 	uni.navigateTo({
-		url: `/pages/JobDetail/JobDetail?id=${job.id}`
+		url: `/pages/Job/JobItem?id=${job.id}`
 	})
 }
 
