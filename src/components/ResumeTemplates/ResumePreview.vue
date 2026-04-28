@@ -2,35 +2,15 @@
 	<view class="resume-preview-wrapper" :class="templateClass">
 		<!-- 简历内容区域 - 用于屏幕显示和打印 -->
 		<view id="resume-content" class="resume-content">
-			<!-- 简约模板 -->
-			<template v-if="template === 'simple'">
-				<SimpleTemplate :resume="resume" />
-			</template>
-
-			<!-- 专业模板 -->
-			<template v-else-if="template === 'professional'">
-				<ProfessionalTemplate :resume="resume" />
-			</template>
-
-			<!-- 创意模板 -->
-			<template v-else-if="template === 'creative'">
-				<CreativeTemplate :resume="resume" />
-			</template>
-
-			<!-- 经典模板 -->
-			<template v-else>
-				<ClassicTemplate :resume="resume" />
-			</template>
+			<component :is="activeTemplateComponent" :resume="normalizedResume" />
 		</view>
 	</view>
 </template>
 
 <script setup>
-import { computed, defineProps } from 'vue'
-import SimpleTemplate from './templates/SimpleTemplate.vue'
-import ProfessionalTemplate from './templates/ProfessionalTemplate.vue'
-import CreativeTemplate from './templates/CreativeTemplate.vue'
-import ClassicTemplate from './templates/ClassicTemplate.vue'
+import { computed } from 'vue'
+import { getTemplateComponent } from './registry'
+import { normalizeResumeForTemplate } from '@/utils/resume/dataTransform'
 
 const props = defineProps({
 	resume: {
@@ -44,6 +24,8 @@ const props = defineProps({
 })
 
 const templateClass = computed(() => `template-${props.template}`)
+const activeTemplateComponent = computed(() => getTemplateComponent(props.template))
+const normalizedResume = computed(() => normalizeResumeForTemplate(props.resume))
 </script>
 
 <style scoped lang="scss">

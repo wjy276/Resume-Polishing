@@ -1,62 +1,83 @@
-<!-- 简历优化页面 -->
-
-
 <template>
-	<view class="resume-container">
-		<!-- 侧边栏 -->
+	<view class="resume-page">
 		<Sidebar />
-		
-		<!-- 主内容区 -->
+
 		<view class="main-content">
-			<!-- 顶部 -->
-			<view class="page-header">
-				<text class="page-title">简历优化</text>
-				<text class="page-subtitle">AI 智能分析简历，根据目标岗位自动优化，提供专业修改建议</text>
+			<!-- Alert banner -->
+			<view class="alert-banner alert-warn">
+				<text class="alert-icon">⚠</text>
+				<view class="alert-body">
+					<text class="alert-title">建议尽快配置同步备份</text>
+					<text class="alert-desc">简历数据仅保存在本地，清除浏览器数据可能导致丢失</text>
+				</view>
+				<button class="alert-action" @click="goToSettings">前往设置</button>
 			</view>
 
-			<!-- 上传区域 -->
-			<view class="upload-section">
-				<view class="upload-card">
-					<text class="upload-icon">📄</text>
-					<text class="upload-title">上传您的简历</text>
-					<text class="upload-desc">支持 PDF、Word 格式，AI 将自动分析并提供优化建议</text>
-					<button class="upload-btn" @click="uploadResume">
-						<text class="btn-text">选择文件</text>
+			<!-- Title row -->
+			<view class="title-row">
+				<text class="page-title">我的简历</text>
+				<view class="title-actions">
+					<button class="btn-outline" @click="showImportTip">
+						<text>⬆ 导入简历</text>
+					</button>
+					<button class="btn-primary" @click="createResume">
+						<text>＋ 新建简历</text>
 					</button>
 				</view>
 			</view>
 
-			<!-- 简历列表 -->
-			<view class="resume-items">
-				<view class="resume-item" v-for="resume in resumeList" :key="resume.id">
-					<view class="item-header">
-						<text class="item-icon">📋</text>
-						<text class="item-title">{{ resume.name }}</text>
-						<text class="item-score">{{ resume.score }}分</text>
+			<!-- Resume grid -->
+			<view class="resume-grid">
+				<!-- Create new card -->
+				<view class="resume-card card-new" @click="createResume">
+					<view class="card-new-inner">
+						<view class="plus-circle">
+							<text class="plus-icon">＋</text>
+						</view>
+						<text class="card-new-title">新建简历</text>
+						<text class="card-new-desc">选一个新简历从头写起</text>
 					</view>
-					<view class="progress-bar">
-						<view class="progress-fill" :style="{ width: resume.score + '%' }"></view>
+				</view>
+
+				<!-- Existing resume cards -->
+				<view
+					v-for="resume in allResumes"
+					:key="resume.id"
+					class="resume-card"
+				>
+					<!-- Mini preview -->
+					<view class="card-preview" ref="cardRefs" @click="editResume(resume.id)">
+						<view class="preview-scaler" :style="scalerStyle(resume)">
+							<div class="preview-inner" :style="previewInnerStyle(resume)">
+								<ClassicTemplate :data="resume" />
+							</div>
+						</view>
+						<!-- Gradient fade at bottom -->
+						<view class="card-fade" />
+						<!-- Title overlay -->
+						<view class="card-overlay">
+							<text class="card-resume-title">{{ resume.title || '未命名简历' }}</text>
+							<text class="card-meta">经典模板 · {{ formatDate(resume.createdAt) }}</text>
+						</view>
 					</view>
-					<view class="item-suggestions">
-						<text class="suggestion-text" v-for="(suggestion, index) in resume.suggestions" :key="index">
-							• {{ suggestion }}
-						</text>
+
+					<!-- Footer actions -->
+					<view class="card-footer">
+						<button class="card-btn" @click="editResume(resume.id)">编辑</button>
+						<button class="card-btn card-btn-danger" @click="confirmDelete(resume)">删除</button>
 					</view>
 				</view>
 			</view>
+		</view>
 
-			<!-- AI 建议 -->
-			<view class="ai-suggestions">
-				<view class="ai-header">
-					<text class="ai-icon">✨</text>
-					<text class="ai-title">AI 智能建议</text>
-				</view>
-				<view class="ai-content">
-					<text class="ai-text">
-						根据您的简历和求职意向，建议重点突出项目经验中的技术亮点，
-						量化工作成果，并使用更专业的术语描述职责。同时，建议增加
-						与目标岗位相关的技能关键词，提高简历匹配度。
-					</text>
+		<!-- Delete confirm modal -->
+		<view v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
+			<view class="modal-box">
+				<text class="modal-title">删除简历</text>
+				<text class="modal-desc">确定要删除「{{ deleteTarget.title || '未命名简历' }}」吗？此操作无法撤销。</text>
+				<view class="modal-actions">
+					<button class="btn-outline" @click="deleteTarget = null">取消</button>
+					<button class="btn-danger" @click="doDelete">确认删除</button>
 				</view>
 			</view>
 		</view>
@@ -64,453 +85,389 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
-import { showTokenExpiredPopup } from '@/stores/user.js'
+import ClassicTemplate from '@/components/resume/ClassicTemplate.vue'
+import { useResumeStore } from '@/stores/resume'
 
-// API 基础地址
-const BASE_URL = 'http://81.71.75.85:6008/api'
+const store = useResumeStore()
+const deleteTarget = ref(null)
 
-// 上传状态
-const uploading = ref(false)
+// card width for scaling; roughly 200px per card column
+const CARD_PREVIEW_WIDTH = 200
+const A4_WIDTH_PX = 793.7
 
-// 当前上传的文件信息（本地状态）
-const currentUploadFile = ref(null)
+const allResumes = computed(() => store.allResumes)
 
-const resumeList = ref([
-	{
-		id: 1,
-		name: '前端开发工程师简历.pdf',
-		score: 85,
-		suggestions: [
-			'项目经验描述可以更具体，突出技术难点和解决方案',
-			'建议增加量化数据，如"性能提升 30%"',
-			'技能清单可以更详细，列出熟悉程度'
-		]
-	},
-	{
-		id: 2,
-		name: '产品经理简历.pdf',
-		score: 78,
-		suggestions: [
-			'产品描述可以更加结构化，突出核心指标',
-			'建议增加用户调研和数据分析相关内容',
-			'项目成果可以用数据说话，如"日活提升 50%"'
-		]
+onLoad(() => {
+	store.loadFromLocal()
+})
+
+function scalerStyle(resume) {
+	const scale = CARD_PREVIEW_WIDTH / A4_WIDTH_PX
+	return {
+		width: `${A4_WIDTH_PX}px`,
+		height: `${A4_WIDTH_PX * (297 / 210)}px`,
+		transform: `scale(${scale})`,
+		transformOrigin: 'top left',
+		position: 'absolute',
+		top: '0',
+		left: '0',
 	}
-])
+}
 
-/**
- * 保存文件信息到本地存储
- * @param {Object} fileInfo 文件信息
- */
-const saveFileInfo = (fileInfo) => {
+function previewInnerStyle(resume) {
+	const gs = resume?.globalSettings || {}
+	return {
+		padding: `${gs.pagePadding ?? 32}px`,
+		background: '#fff',
+		width: '100%',
+		height: '100%',
+		boxSizing: 'border-box',
+	}
+}
+
+function formatDate(iso) {
+	if (!iso) return ''
 	try {
-		uni.setStorageSync('currentResumeFile', JSON.stringify(fileInfo))
-	} catch (e) {
-		console.error('保存文件信息失败:', e)
+		const d = new Date(iso)
+		return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+	} catch {
+		return ''
 	}
 }
 
-/**
- * 获取保存的文件信息
- * @returns {Object|null}
- */
-const getSavedFileInfo = () => {
-	try {
-		const data = uni.getStorageSync('currentResumeFile')
-		return data ? JSON.parse(data) : null
-	} catch (e) {
-		console.error('获取文件信息失败:', e)
-		return null
+function createResume() {
+	const id = store.createResume({ title: `新建简历 ${Object.keys(store.resumes).length + 1}` })
+	uni.navigateTo({ url: `/pages/Resume/ResumeEditor?id=${id}` })
+}
+
+function editResume(id) {
+	store.setActiveResume(id)
+	uni.navigateTo({ url: `/pages/Resume/ResumeEditor?id=${id}` })
+}
+
+function confirmDelete(resume) {
+	deleteTarget.value = resume
+}
+
+function doDelete() {
+	if (deleteTarget.value) {
+		store.deleteResume(deleteTarget.value.id)
+		deleteTarget.value = null
 	}
 }
 
-/**
- * 清除保存的文件信息
- */
-const clearFileInfo = () => {
-	try {
-		uni.removeStorageSync('currentResumeFile')
-	} catch (e) {
-		console.error('清除文件信息失败:', e)
-	}
+function goToSettings() {
+	uni.showToast({ title: '设置功能开发中', icon: 'none' })
 }
 
-// 上传简历到后端
-const uploadResume = () => {
-	// 检查登录状态
-	const token = uni.getStorageSync('token')
-	if (!token) {
-		uni.showModal({
-			title: '提示',
-			content: '请先登录后再上传简历',
-			confirmText: '去登录',
-			confirmColor: '#1e3a8a',
-			success: (res) => {
-				if (res.confirm) {
-					uni.navigateTo({
-						url: '/pages/Login/Login'
-					})
-				}
-			}
-		})
-		return
-	}
-
-	uni.chooseFile({
-		accept: 'file',
-		extension: ['.pdf', '.doc', '.docx'],
-		success: (res) => {
-			console.log('选择的文件:', res)
-
-			if (res.tempFilePaths && res.tempFilePaths.length > 0) {
-				const filePath = res.tempFilePaths[0]
-				const tempFile = res.tempFiles[0]
-				const fileName = tempFile?.name || '简历文件'
-				const fileSize = tempFile?.size || 0
-
-				// 保存当前上传的文件信息
-				currentUploadFile.value = {
-					name: fileName,
-					path: filePath,
-					size: fileSize,
-					type: getFileType(fileName),
-					uploadTime: Date.now()
-				}
-
-				// 同时保存到本地存储（用于页面跳转后获取）
-				saveFileInfo(currentUploadFile.value)
-
-				uploading.value = true
-
-				uni.showLoading({
-					title: '正在上传...'
-				})
-
-				uni.uploadFile({
-					url: `${BASE_URL}/v1/resume/parse`,
-					filePath: filePath,
-					name: 'file',
-					header: {
-						'Authorization': "Bearer "+token
-					},
-					formData: {
-						'fileName': fileName
-					},
-					success: (uploadRes) => {
-						uni.hideLoading()
-						uploading.value = false
-
-						console.log('上传结果:', uploadRes)
-						console.log('状态码:', uploadRes.statusCode)
-
-						// 检查 Token 过期（HTTP 401）
-						if (uploadRes.statusCode === 401) {
-							console.log('Token 已过期')
-							clearFileInfo()
-							showTokenExpiredPopup()
-							return
-						}
-
-						if (uploadRes.statusCode === 200) {
-							try {
-								const result = JSON.parse(uploadRes.data)
-								console.log('解析结果:', result)
-								console.log('业务码:', result.code)
-								console.log('返回数据:', result.data)
-
-								// 检查业务码是否表示 Token 过期
-								// 1007: Token已过期
-								// 401: 未授权
-								// 'UNAUTHORIZED': 未授权
-								if (result.code === 1007 || result.code === 401 || result.code === 'UNAUTHORIZED') {
-									console.log('业务码提示 Token 过期:', result.message)
-									clearFileInfo()
-									showTokenExpiredPopup()
-									return
-								}
-
-								// 兼容多种业务码格式
-								if ((result.code === 0 || result.code === 200) && result.data) {
-									// 合并文件信息和接口返回数据
-									const resumeData = {
-										fileName: fileName,
-										filePath: filePath,
-										fileSize: fileSize,
-										fileType: getFileType(fileName),
-										uploadTime: currentUploadFile.value.uploadTime,
-										...result.data
-									}
-
-									console.log('准备跳转，数据:', resumeData)
-
-									// 保存完整数据到本地存储
-									saveResumeDataToStorage(resumeData)
-
-									// 跳转到模板页面
-									uni.navigateTo({
-										url: '/pages/Resume/ResumeTemplate',
-										success: () => {
-											console.log('跳转成功')
-										},
-										fail: (err) => {
-											console.error('跳转失败:', err)
-										}
-									})
-								} else {
-									// 接口返回错误时清除文件信息
-									clearFileInfo()
-									console.log('业务错误:', result.message)
-									uni.showToast({
-										title: result.message || '上传失败',
-										icon: 'none'
-									})
-								}
-							} catch (e) {
-								console.error('解析响应失败:', e)
-								clearFileInfo()
-								uni.showToast({
-									title: '数据解析失败',
-									icon: 'none'
-								})
-							}
-						} else {
-							clearFileInfo()
-							uni.showToast({
-								title: '上传失败，请重试',
-								icon: 'none'
-							})
-						}
-					},
-					fail: (err) => {
-						uni.hideLoading()
-						uploading.value = false
-						clearFileInfo()
-						console.error('上传失败:', err)
-						uni.showToast({
-							title: '网络错误，请稍后重试',
-							icon: 'none'
-						})
-					}
-				})
-			}
-		},
-		fail: (err) => {
-			console.log('选择文件取消或失败:', err)
-		}
-	})
-}
-
-/**
- * 保存简历数据到本地存储
- * @param {Object} data
- */
-const saveResumeDataToStorage = (data) => {
-	try {
-		uni.setStorageSync('currentResumeData', JSON.stringify(data))
-	} catch (e) {
-		console.error('保存简历数据失败:', e)
-	}
-}
-
-/**
- * 根据文件名获取文件类型
- * @param {string} fileName
- * @returns {string}
- */
-const getFileType = (fileName) => {
-	if (!fileName) return 'unknown'
-	const ext = fileName.split('.').pop()?.toLowerCase()
-	const typeMap = {
-		'pdf': 'PDF',
-		'doc': 'Word',
-		'docx': 'Word'
-	}
-	return typeMap[ext] || '未知'
+function showImportTip() {
+	uni.showToast({ title: '导入功能开发中', icon: 'none' })
 }
 </script>
 
 <style scoped lang="scss">
-.resume-container {
+.resume-page {
 	display: flex;
 	height: 100vh;
-	background-color: #f9fafb;
+	background: #f9fafb;
+	overflow: hidden;
 }
 
 .main-content {
 	flex: 1;
 	margin-left: 20%;
-	padding: 64rpx;
+	padding: 0 32px 40px;
 	overflow-y: auto;
+	min-width: 0;
 }
 
-.page-header {
-	margin-bottom: 64rpx;
+/* Alert */
+.alert-banner {
 	display: flex;
-	flex-direction: column;
-	gap: 16rpx;
+	align-items: center;
+	gap: 10px;
+	padding: 12px 16px;
+	border-radius: 8px;
+	border: 1px solid;
+	margin: 20px 0 0;
+}
+
+.alert-warn {
+	border-color: #fca5a5;
+	background: rgba(254, 242, 242, 0.6);
+	color: #991b1b;
+}
+
+.alert-icon { font-size: 14px; flex-shrink: 0; }
+
+.alert-body { flex: 1; min-width: 0; }
+
+.alert-title { display: block; font-size: 13px; font-weight: 600; color: #991b1b; }
+
+.alert-desc { display: block; font-size: 12px; color: #b91c1c; margin-top: 2px; }
+
+.alert-action {
+	background: transparent;
+	border: 1px solid #fca5a5;
+	color: #991b1b;
+	border-radius: 5px;
+	padding: 4px 12px;
+	font-size: 12px;
+	cursor: pointer;
+	white-space: nowrap;
+	flex-shrink: 0;
+
+	&:hover { background: #fee2e2; }
+}
+
+/* Title row */
+.title-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin: 28px 0 20px;
 }
 
 .page-title {
-	font-size: 56rpx;
-	font-weight: 600;
+	font-size: 28px;
+	font-weight: 700;
 	color: #111827;
 }
 
-.page-subtitle {
-	font-size: 32rpx;
-	color: #6b7280;
+.title-actions {
+	display: flex;
+	align-items: center;
+	gap: 10px;
 }
 
-.upload-section {
-	margin-bottom: 64rpx;
-}
-
-.upload-card {
-	background: linear-gradient(135deg, #3b82f6, #06b6d4);
-	padding: 80rpx;
-	border-radius: 32rpx;
-	text-align: center;
-	box-shadow: 0 8rpx 24rpx rgba(59, 130, 246, 0.3);
-}
-
-.upload-icon {
-	font-size: 128rpx;
-	display: block;
-	margin-bottom: 32rpx;
-}
-
-.upload-title {
-	font-size: 48rpx;
-	font-weight: 600;
-	color: #ffffff;
-	display: block;
-	margin-bottom: 16rpx;
-}
-
-.upload-desc {
-	font-size: 28rpx;
-	color: rgba(255, 255, 255, 0.9);
-	display: block;
-	margin-bottom: 48rpx;
-}
-
-.upload-btn {
-	background: #ffffff;
-	color: #3b82f6;
-	border: none;
-	padding: 24rpx 80rpx;
-	border-radius: 16rpx;
-	font-size: 32rpx;
-	font-weight: 600;
+.btn-outline {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 7px 16px;
+	border: 1px solid #d1d5db;
+	border-radius: 7px;
+	background: #fff;
+	font-size: 13px;
+	color: #374151;
 	cursor: pointer;
-	transition: all 0.3s;
-	display: inline-block;
+	transition: all 0.15s;
 
-	&:hover {
-		transform: translateY(-4rpx);
-		box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.2);
-	}
+	&:hover { border-color: #9ca3af; background: #f9fafb; }
 }
 
-.btn-text {
-	display: block;
+.btn-primary {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 7px 16px;
+	background: #111827;
+	color: #fff;
+	border: none;
+	border-radius: 7px;
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 0.15s;
+
+	&:hover { background: #1f2937; }
 }
 
-.resume-items {
+/* Grid */
+.resume-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	gap: 20px;
+}
+
+/* Card base */
+.resume-card {
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	overflow: hidden;
+	background: #fff;
+	aspect-ratio: 210 / 297;
 	display: flex;
 	flex-direction: column;
-	gap: 40rpx;
-	margin-bottom: 64rpx;
+	transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+	cursor: pointer;
+
+	&:hover {
+		border-color: rgba(37, 99, 235, 0.4);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+		transform: translateY(-2px);
+	}
 }
 
-.resume-item {
-	background: #ffffff;
-	padding: 48rpx;
-	border-radius: 24rpx;
-	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
+/* Create card */
+.card-new {
+	border-style: dashed;
+
+	&:hover { border-color: #93c5fd; background: #eff6ff; }
 }
 
-.item-header {
+.card-new-inner {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	flex: 1;
+	gap: 10px;
+	padding: 20px;
+	text-align: center;
+}
+
+.plus-circle {
+	width: 52px;
+	height: 52px;
+	border-radius: 50%;
+	background: #f3f4f6;
 	display: flex;
 	align-items: center;
-	gap: 24rpx;
-	margin-bottom: 32rpx;
+	justify-content: center;
+	transition: background 0.15s;
+
+	.card-new:hover & { background: #dbeafe; }
 }
 
-.item-icon {
-	font-size: 48rpx;
-}
+.plus-icon { font-size: 22px; color: #6b7280; .card-new:hover & { color: #2563eb; } }
 
-.item-title {
+.card-new-title { font-size: 14px; font-weight: 600; color: #111827; }
+
+.card-new-desc { font-size: 12px; color: #9ca3af; }
+
+/* Preview area */
+.card-preview {
 	flex: 1;
-	font-size: 36rpx;
+	position: relative;
+	overflow: hidden;
+	background: #f9fafb;
+}
+
+.preview-scaler {
+	pointer-events: none;
+}
+
+.preview-inner {
+	pointer-events: none;
+}
+
+/* Gradient fade */
+.card-fade {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: 55%;
+	background: linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.8) 40%, transparent 100%);
+	pointer-events: none;
+}
+
+/* Title overlay at bottom of preview */
+.card-overlay {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	padding: 8px 10px 10px;
+	z-index: 2;
+}
+
+.card-resume-title {
+	display: block;
+	font-size: 13px;
 	font-weight: 600;
 	color: #111827;
-}
-
-.item-score {
-	font-size: 36rpx;
-	font-weight: 700;
-	color: #3b82f6;
-}
-
-.progress-bar {
-	height: 16rpx;
-	background: #f3f4f6;
-	border-radius: 8rpx;
+	white-space: nowrap;
 	overflow: hidden;
-	margin-bottom: 32rpx;
+	text-overflow: ellipsis;
 }
 
-.progress-fill {
-	height: 100%;
-	background: linear-gradient(90deg, #3b82f6, #10b981);
-	border-radius: 8rpx;
-	transition: width 0.3s;
+.card-meta {
+	display: block;
+	font-size: 11px;
+	color: #6b7280;
+	margin-top: 2px;
 }
 
-.item-suggestions {
-	.suggestion-text {
-		display: block;
-		font-size: 28rpx;
-		color: #6b7280;
-		line-height: 1.6;
-		margin-bottom: 8rpx;
-	}
+/* Card footer */
+.card-footer {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px;
+	padding: 6px 8px 8px;
+	border-top: 1px solid #f3f4f6;
+	background: #fff;
+	flex-shrink: 0;
 }
 
-.ai-suggestions {
-	background: linear-gradient(135deg, #fef3c7, #fde68a);
-	padding: 48rpx;
-	border-radius: 24rpx;
-	border: 4rpx solid #f59e0b;
+.card-btn {
+	padding: 5px;
+	border: 1px solid #e5e7eb;
+	border-radius: 5px;
+	background: #fff;
+	font-size: 12px;
+	color: #374151;
+	cursor: pointer;
+	text-align: center;
+	transition: background 0.15s;
+
+	&:hover { background: #f3f4f6; }
 }
 
-.ai-header {
+.card-btn-danger {
+	color: #ef4444;
+
+	&:hover { background: #fef2f2; border-color: #fca5a5; }
+}
+
+/* Delete modal */
+.modal-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.45);
+	z-index: 100;
 	display: flex;
 	align-items: center;
-	gap: 24rpx;
-	margin-bottom: 32rpx;
+	justify-content: center;
 }
 
-.ai-icon {
-	font-size: 48rpx;
+.modal-box {
+	background: #fff;
+	border-radius: 12px;
+	padding: 28px 28px 20px;
+	width: 380px;
+	max-width: 90vw;
+	box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
 }
 
-.ai-title {
-	font-size: 36rpx;
-	font-weight: 600;
-	color: #92400e;
+.modal-title { display: block; font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 10px; }
+
+.modal-desc { display: block; font-size: 13px; color: #6b7280; line-height: 1.6; margin-bottom: 20px; }
+
+.modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
 }
 
-.ai-content {
-	.ai-text {
-		font-size: 30rpx;
-		line-height: 1.8;
-		color: #78350f;
-		display: block;
-	}
+.btn-danger {
+	padding: 7px 18px;
+	background: #ef4444;
+	color: #fff;
+	border: none;
+	border-radius: 6px;
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+
+	&:hover { background: #dc2626; }
+}
+
+@media (max-width: 1200px) {
+	.main-content { margin-left: 240px; }
 }
 </style>

@@ -7,14 +7,14 @@
 
 		<view class="template-grid">
 			<view
-				v-for="(config, key) in templateConfig"
-				:key="key"
+				v-for="template in templates"
+				:key="template.id"
 				class="template-card"
-				:class="{ active: selectedTemplate === key }"
-				@click="selectTemplate(key)"
+				:class="{ active: selectedTemplate === template.layout }"
+				@click="selectTemplate(template.layout)"
 			>
-				<view class="template-preview" :style="getPreviewStyle(key)">
-					<view class="preview-header" :style="{ backgroundColor: config.colors.primary }">
+				<view class="template-preview" :style="getPreviewStyle(template)">
+					<view class="preview-header" :style="{ backgroundColor: template.colorScheme.primary }">
 						<view class="preview-avatar"></view>
 						<view class="preview-info">
 							<view class="preview-name"></view>
@@ -28,10 +28,10 @@
 					</view>
 				</view>
 				<view class="template-info">
-					<text class="template-name">{{ config.name }}</text>
-					<text class="template-desc">{{ config.description }}</text>
+					<text class="template-name">{{ template.name }}</text>
+					<text class="template-desc">{{ template.description }}</text>
 				</view>
-				<view v-if="selectedTemplate === key" class="selected-badge">
+				<view v-if="selectedTemplate === template.layout" class="selected-badge">
 					<text class="check-icon">✓</text>
 				</view>
 			</view>
@@ -51,14 +51,14 @@
 </template>
 
 <script setup>
-import { ref, defineProps, defineEmits } from 'vue'
-import { templateConfig, templateTypes } from '@/utils/resumeData.js'
+import { ref, computed, watch } from 'vue'
+import { DEFAULT_TEMPLATES, getDefaultTemplateId } from './registry'
 
 // Props
 const props = defineProps({
 	modelValue: {
 		type: String,
-		default: templateTypes.SIMPLE
+		default: getDefaultTemplateId()
 	}
 })
 
@@ -67,15 +67,21 @@ const emit = defineEmits(['update:modelValue', 'preview', 'export'])
 
 // 当前选中的模板
 const selectedTemplate = ref(props.modelValue)
+const templates = computed(() => DEFAULT_TEMPLATES)
+
+watch(
+	() => props.modelValue,
+	(newValue) => {
+		selectedTemplate.value = newValue || getDefaultTemplateId()
+	}
+)
 
 // 获取预览样式
-const getPreviewStyle = (key) => {
-	const config = templateConfig[key]
+const getPreviewStyle = (config) => {
 	return {
-		borderColor: config.colors.primary,
-		'--primary-color': config.colors.primary,
-		'--secondary-color': config.colors.secondary,
-		'--accent-color': config.colors.accent
+		borderColor: config.colorScheme.primary,
+		'--primary-color': config.colorScheme.primary,
+		'--secondary-color': config.colorScheme.secondary
 	}
 }
 

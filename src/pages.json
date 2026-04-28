@@ -65,6 +65,19 @@
 			"style": {
 				"navigationBarTitleText": "ResumeTemplateChooce"
 			}
+		},
+		{
+			"path": "pages/Resume/ResumeEditor",
+			"style": {
+				"navigationBarTitleText": "编辑简历",
+				"navigationStyle": "custom"
+			}
+		},
+		{
+			"path": "pages/Resume/ResumePreview",
+			"style": {
+				"navigationBarTitleText": "预览简历"
+			}
 		}
 	],
 	"window": {
