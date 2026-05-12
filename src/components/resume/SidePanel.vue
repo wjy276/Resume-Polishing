@@ -273,6 +273,17 @@ function addSection(mod) {
 	store.updateMenuSections([...menuSections.value, {
 		id: mod.id, title: mod.title, icon: mod.icon, enabled: true, order: menuSections.value.length,
 	}])
+	// 给空模块自动添加一条占位项，让右侧立刻看到结构
+	const resume = store.activeResume
+	if (mod.id === 'experience' && !(resume?.experience?.length)) {
+		store.addExperience({ company: '', position: '', date: '', details: '' })
+	} else if (mod.id === 'projects' && !(resume?.projects?.length)) {
+		store.addProject({ name: '', role: '', date: '', description: '' })
+	} else if (mod.id === 'education' && !(resume?.education?.length)) {
+		store.addEducation({ school: '', major: '', degree: '', startDate: '', endDate: '', isCurrent: false, description: '' })
+	}
+	// 跳转到该模块，方便用户立即编辑
+	store.setActiveSection(mod.id)
 	showAddPopup.value = false
 }
 

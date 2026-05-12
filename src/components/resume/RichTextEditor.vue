@@ -70,6 +70,9 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const focused = ref(false)
+// 关键：标记"刚刚是我们自己 emit 出去的"，避免外部 watcher 把光标打回来
+let selfEmitted = ''
+let typingLock = false
 
 const editor = useEditor({
 	content: props.modelValue || '',
@@ -84,19 +87,25 @@ const editor = useEditor({
 		},
 	},
 	onUpdate({ editor }) {
-		emit('update:modelValue', editor.getHTML())
+		const html = editor.getHTML()
+		selfEmitted = html
+		typingLock = true
+		emit('update:modelValue', html)
+		// 解锁延后一个 tick，让 store 回流到 props 的过程跳过 watcher
+		Promise.resolve().then(() => { typingLock = false })
 	},
 	onFocus() { focused.value = true },
 	onBlur() { focused.value = false },
 })
 
-// Sync when modelValue changes externally (e.g. loading from store)
+// Sync when modelValue changes externally（仅"非自己 emit 出去的"才回写编辑器，避免破坏光标）
 watch(() => props.modelValue, (val) => {
 	if (!editor.value) return
+	if (typingLock) return
+	if (val === selfEmitted) return
 	const current = editor.value.getHTML()
-	if (val !== current) {
-		editor.value.commands.setContent(val || '', false)
-	}
+	if (val === current) return
+	editor.value.commands.setContent(val || '', false)
 })
 
 onBeforeUnmount(() => {

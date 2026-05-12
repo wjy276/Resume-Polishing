@@ -1,324 +1,393 @@
+/**
+ * 简历 Store — 完全重写版（setup-style + reactive + deep watch）
+ *
+ * 设计原则：
+ *   1. 简历对象本身是 reactive，编辑器/预览都直接读写它的属性 → 天然实时响应。
+ *   2. v-model 直接绑 store.activeResume.basic.name 这种路径，不再走 action 包装。
+ *   3. 持久化通过对 resumes 的 deep watch + 300ms debounce 自动完成。
+ *   4. 多简历切换通过替换 activeResumeId 实现，模板 ref 不变。
+ */
+
 import { defineStore } from 'pinia'
+import { ref, reactive, computed, watch } from 'vue'
 import { createNewResume, generateId } from '@/utils/resume/initialData'
 
 const STORAGE_KEY = 'magic_resume_store'
+const SAVE_DEBOUNCE_MS = 300
 
-export const useResumeStore = defineStore('resume', {
-	state: () => ({
-		resumes: {},
-		activeResumeId: null,
-	}),
+// AI 优化结果回写时用的模块字段映射
+export const SECTION_FIELD_MAP = {
+	skills:         { type: 'top', field: 'skillContent' },
+	selfEvaluation: { type: 'top', field: 'selfEvaluationContent' },
+	experience:     { type: 'list', field: 'experience', html: 'details' },
+	projects:       { type: 'list', field: 'projects', html: 'description' },
+	education:      { type: 'list', field: 'education', html: 'description' },
+}
 
-	getters: {
-		activeResume: (state) =>
-			state.activeResumeId ? state.resumes[state.activeResumeId] : null,
-		allResumes: (state) =>
-			Object.values(state.resumes).sort(
-				(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-			),
-	},
+export const useResumeStore = defineStore('resume', () => {
+	// ════════════════════════════════════════════════════════════════
+	// 1. 状态
+	// ════════════════════════════════════════════════════════════════
+	const resumes = reactive({}) // { [id]: ResumeData }
+	const activeResumeId = ref(null)
 
-	actions: {
-		// ───── resume lifecycle ─────
-		createResume(overrides = {}) {
-			const resume = createNewResume(overrides)
-			this.$patch((state) => {
-				state.resumes[resume.id] = resume
-				state.activeResumeId = resume.id
-			})
-			this.saveToLocal()
-			return resume.id
-		},
+	// ════════════════════════════════════════════════════════════════
+	// 2. 派生
+	// ════════════════════════════════════════════════════════════════
+	/**
+	 * 当前简历 —— 返回的是 reactive 原对象（不是 clone）。
+	 * 组件做 v-model="store.activeResume.basic.name" 即可直接读写。
+	 */
+	const activeResume = computed(() =>
+		activeResumeId.value ? resumes[activeResumeId.value] || null : null
+	)
 
-		addResume(resumeData) {
-			const id = resumeData.id || generateId()
-			this.$patch((state) => {
-				state.resumes[id] = { ...resumeData, id }
-			})
-			this.saveToLocal()
-			return id
-		},
+	const allResumes = computed(() =>
+		Object.values(resumes).sort(
+			(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+		)
+	)
 
-		updateResume(id, partial) {
-			if (!this.resumes[id]) return
-			this.$patch((state) => {
-				Object.assign(state.resumes[id], partial, {
-					updatedAt: new Date().toISOString(),
-				})
-			})
-			this.saveToLocal()
-		},
+	// ════════════════════════════════════════════════════════════════
+	// 3. CRUD —— 只做"新增/删除/切换"这种不能用 v-model 解决的事
+	//    具体字段的修改全部交给 v-model 直接干，store 不再写一堆 update*
+	// ════════════════════════════════════════════════════════════════
+	function createResume(overrides = {}) {
+		const r = createNewResume(overrides)
+		resumes[r.id] = r
+		activeResumeId.value = r.id
+		return r.id
+	}
 
-		deleteResume(id) {
-			if (!this.resumes[id]) return
-			this.$patch((state) => {
-				delete state.resumes[id]
-				if (state.activeResumeId === id) {
-					const remaining = Object.keys(state.resumes)
-					state.activeResumeId = remaining.length ? remaining[0] : null
-				}
-			})
-			this.saveToLocal()
-		},
+	function addResume(resumeData) {
+		const id = resumeData.id || generateId()
+		resumes[id] = { ...resumeData, id }
+		return id
+	}
 
-		setActiveResume(id) {
-			this.$patch({ activeResumeId: id })
-		},
+	function deleteResume(id) {
+		if (!resumes[id]) return
+		delete resumes[id]
+		if (activeResumeId.value === id) {
+			const left = Object.keys(resumes)
+			activeResumeId.value = left.length ? left[0] : null
+		}
+	}
 
-		// ───── active resume mutations ─────
-		// All mutations use $patch callback with in-place Object.assign for reliable Vue 3 reactivity
-		_patchActive(partial) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				Object.assign(resume, partial, { updatedAt: new Date().toISOString() })
-			})
-			this.saveToLocal()
-		},
+	function setActiveResume(id) {
+		activeResumeId.value = id
+	}
 
-		updateResumeTitle(title) {
-			this._patchActive({ title })
-		},
+	function updateResume(id, partial) {
+		if (!resumes[id]) return
+		Object.assign(resumes[id], partial, { updatedAt: new Date().toISOString() })
+	}
 
-		setActiveSection(sectionId) {
-			this._patchActive({ activeSection: sectionId })
-		},
+	function updateResumeTitle(title) {
+		if (activeResume.value) activeResume.value.title = title
+	}
 
-		setTemplateId(templateId) {
-			if (!templateId) return
-			this._patchActive({ templateId })
-		},
+	// ─── menuSections / 切换模块 ──────────────────────────────
+	function setActiveSection(sectionId) {
+		if (activeResume.value) activeResume.value.activeSection = sectionId
+	}
 
-		updateGlobalSettings(partial) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				if (!resume.globalSettings) resume.globalSettings = {}
-				Object.assign(resume.globalSettings, partial)
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	function setTemplateId(templateId) {
+		if (activeResume.value && templateId) activeResume.value.templateId = templateId
+	}
 
-		setThemeColor(color) {
-			this.updateGlobalSettings({ themeColor: color })
-		},
+	function updateMenuSections(sections) {
+		if (activeResume.value) activeResume.value.menuSections = sections
+	}
 
-		updateMenuSections(sections) {
-			this._patchActive({ menuSections: sections })
-		},
+	function removeMenuSection(sectionId) {
+		const r = activeResume.value
+		if (!r || sectionId === 'basic') return
+		r.menuSections = (r.menuSections || []).filter((s) => s.id !== sectionId)
+		if (sectionId === 'experience') r.experience = []
+		if (sectionId === 'projects') r.projects = []
+		if (sectionId === 'education') r.education = []
+		if (sectionId === 'skills') r.skillContent = ''
+		if (sectionId === 'selfEvaluation') r.selfEvaluationContent = ''
+		if (r.customData && r.customData[sectionId]) delete r.customData[sectionId]
+		if (r.activeSection === sectionId) {
+			const fallback = r.menuSections.find((s) => s.enabled) || r.menuSections[0]
+			r.activeSection = fallback?.id || 'basic'
+		}
+	}
 
-		toggleSectionVisibility(sectionId) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				const sections = (resume.menuSections || []).map((s) =>
-					s.id === sectionId ? { ...s, enabled: !s.enabled } : s
-				)
-				const currentSection = sections.find((section) => section.id === resume.activeSection)
-				if (currentSection && currentSection.enabled === false) {
-					const enabledSections = sections
-						.filter((section) => section.enabled)
-						.sort((a, b) => a.order - b.order)
-					const fallbackSection =
-						enabledSections.find((section) => section.id === 'basic') || enabledSections[0]
-					if (fallbackSection) {
-						resume.activeSection = fallbackSection.id
-					}
-				}
-				resume.menuSections = sections
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	function toggleSectionVisibility(sectionId) {
+		const r = activeResume.value
+		if (!r) return
+		const sections = (r.menuSections || []).map((s) =>
+			s.id === sectionId ? { ...s, enabled: !s.enabled } : s
+		)
+		const cur = sections.find((s) => s.id === r.activeSection)
+		if (cur && cur.enabled === false) {
+			const enabled = sections.filter((s) => s.enabled).sort((a, b) => a.order - b.order)
+			const fb = enabled.find((s) => s.id === 'basic') || enabled[0]
+			if (fb) r.activeSection = fb.id
+		}
+		r.menuSections = sections
+	}
 
-		reorderSections(fromIndex, toIndex) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				const sections = [...(resume.menuSections || [])]
-				const [item] = sections.splice(fromIndex, 1)
-				sections.splice(toIndex, 0, item)
-				resume.menuSections = sections.map((s, i) => ({ ...s, order: i }))
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	function reorderSections(from, to) {
+		const r = activeResume.value
+		if (!r) return
+		const list = [...(r.menuSections || [])]
+		if (from < 0 || to < 0 || from >= list.length || to >= list.length) return
+		const [item] = list.splice(from, 1)
+		list.splice(to, 0, item)
+		r.menuSections = list.map((s, i) => ({ ...s, order: i }))
+	}
 
-		// ───── basic info ─────
-		updateBasicInfo(partial) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				if (!resume.basic) resume.basic = {}
-				Object.assign(resume.basic, partial)
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	function updateGlobalSettings(partial) {
+		if (!activeResume.value) return
+		if (!activeResume.value.globalSettings) activeResume.value.globalSettings = {}
+		Object.assign(activeResume.value.globalSettings, partial)
+	}
 
-		// ───── education ─────
-		addEducation(item) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				const edu = { id: generateId(), visible: true, ...item }
-				resume.education = [...(resume.education || []), edu]
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	function setThemeColor(color) {
+		updateGlobalSettings({ themeColor: color })
+	}
 
-		updateEducation(id, partial) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				const edu = (resume.education || []).find((e) => e.id === id)
-				if (edu) Object.assign(edu, partial)
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	// ─── 列表项 CRUD（只做 add / delete / reorder；编辑全靠 v-model）──
+	function _list(field) {
+		const r = activeResume.value
+		if (!r) return null
+		if (!Array.isArray(r[field])) r[field] = []
+		return r[field]
+	}
 
-		deleteEducation(id) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				resume.education = (resume.education || []).filter((e) => e.id !== id)
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	function _add(field, item) {
+		const list = _list(field)
+		if (!list) return null
+		const newItem = { id: generateId(), visible: true, ...item }
+		list.push(newItem)
+		return newItem.id
+	}
 
-		// ───── experience ─────
-		addExperience(item) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				const exp = { id: generateId(), visible: true, ...item }
-				resume.experience = [...(resume.experience || []), exp]
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	function _remove(field, id) {
+		const list = _list(field)
+		if (!list) return
+		const idx = list.findIndex((it) => it.id === id)
+		if (idx >= 0) list.splice(idx, 1)
+	}
 
-		updateExperience(id, partial) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				const exp = (resume.experience || []).find((e) => e.id === id)
-				if (exp) Object.assign(exp, partial)
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	function _reorder(field, from, to) {
+		const list = _list(field)
+		if (!list) return
+		if (from < 0 || to < 0 || from >= list.length || to >= list.length) return
+		const [item] = list.splice(from, 1)
+		list.splice(to, 0, item)
+	}
 
-		deleteExperience(id) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				resume.experience = (resume.experience || []).filter((e) => e.id !== id)
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	const addExperience    = (item) => _add('experience', item)
+	const deleteExperience = (id) => _remove('experience', id)
+	const reorderExperience = (f, t) => _reorder('experience', f, t)
 
-		// ───── projects ─────
-		addProject(item) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				const proj = { id: generateId(), visible: true, ...item }
-				resume.projects = [...(resume.projects || []), proj]
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	const addProject     = (item) => _add('projects', item)
+	const deleteProject  = (id) => _remove('projects', id)
+	const reorderProjects = (f, t) => _reorder('projects', f, t)
 
-		updateProject(id, partial) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				const proj = (resume.projects || []).find((p) => p.id === id)
-				if (proj) Object.assign(proj, partial)
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	const addEducation     = (item) => _add('education', item)
+	const deleteEducation  = (id) => _remove('education', id)
+	const reorderEducation = (f, t) => _reorder('education', f, t)
 
-		deleteProject(id) {
-			if (!this.activeResumeId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				resume.projects = (resume.projects || []).filter((p) => p.id !== id)
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
+	// ─── 兼容旧 action 名（让没改完的旧代码不报错；内部都改成直接 mutate）─
+	function updateBasicInfo(partial) {
+		if (!activeResume.value) return
+		if (!activeResume.value.basic) activeResume.value.basic = {}
+		Object.assign(activeResume.value.basic, partial)
+	}
+	function updateExperience(id, partial) {
+		const item = (activeResume.value?.experience || []).find((e) => e.id === id)
+		if (item) Object.assign(item, partial)
+	}
+	function updateProject(id, partial) {
+		const item = (activeResume.value?.projects || []).find((e) => e.id === id)
+		if (item) Object.assign(item, partial)
+	}
+	function updateEducation(id, partial) {
+		const item = (activeResume.value?.education || []).find((e) => e.id === id)
+		if (item) Object.assign(item, partial)
+	}
+	function updateSkillContent(html) {
+		if (activeResume.value) activeResume.value.skillContent = html
+	}
+	function updateSelfEvaluation(html) {
+		if (activeResume.value) activeResume.value.selfEvaluationContent = html
+	}
 
-		// ───── content sections ─────
-		updateSkillContent(content) {
-			this._patchActive({ skillContent: content })
-		},
+	// ─── 自定义模块 / 证书 ───
+	function _customList(sectionId) {
+		const r = activeResume.value
+		if (!r || !sectionId) return null
+		if (!r.customData) r.customData = {}
+		if (!Array.isArray(r.customData[sectionId])) r.customData[sectionId] = []
+		return r.customData[sectionId]
+	}
+	function updateCustomSection(sectionId, items) {
+		const list = _customList(sectionId)
+		if (list) {
+			activeResume.value.customData[sectionId] = items
+		}
+	}
+	function addCustomItem(sectionId, item) {
+		const list = _customList(sectionId)
+		if (!list) return null
+		const newItem = { id: generateId(), visible: true, ...item }
+		list.push(newItem)
+		return newItem.id
+	}
+	function updateCustomItem(sectionId, id, partial) {
+		const list = _customList(sectionId)
+		if (!list) return
+		const it = list.find((x) => x.id === id)
+		if (it) Object.assign(it, partial)
+	}
+	function deleteCustomItem(sectionId, id) {
+		const list = _customList(sectionId)
+		if (!list) return
+		const idx = list.findIndex((x) => x.id === id)
+		if (idx >= 0) list.splice(idx, 1)
+	}
+	function reorderCustomItems(sectionId, from, to) {
+		const list = _customList(sectionId)
+		if (!list) return
+		if (from < 0 || to < 0 || from >= list.length || to >= list.length) return
+		const [item] = list.splice(from, 1)
+		list.splice(to, 0, item)
+	}
 
-		updateSelfEvaluation(content) {
-			this._patchActive({ selfEvaluationContent: content })
-		},
-
-		updateCustomSection(sectionId, items) {
-			if (!this.activeResumeId || !sectionId) return
-			this.$patch((state) => {
-				const resume = state.resumes[state.activeResumeId]
-				if (!resume) return
-				if (!resume.customData) resume.customData = {}
-				resume.customData[sectionId] = items
-				resume.updatedAt = new Date().toISOString()
-			})
-			this.saveToLocal()
-		},
-
-		// ───── persistence ─────
-		saveToLocal() {
-			try {
-				uni.setStorageSync(STORAGE_KEY, JSON.stringify({
-					resumes: this.resumes,
-					activeResumeId: this.activeResumeId,
-				}))
-			} catch (e) {
-				console.error('保存简历失败:', e)
+	// ─── AI 优化结果回写 ───
+	function applyOptimizedModule(moduleId, html) {
+		if (!moduleId || !html || !activeResume.value) return
+		const cfg = SECTION_FIELD_MAP[moduleId]
+		if (cfg?.type === 'top') {
+			activeResume.value[cfg.field] = html
+			return
+		}
+		if (cfg?.type === 'list') {
+			const list = activeResume.value[cfg.field] || []
+			if (list.length) {
+				list[0][cfg.html] = html
+			} else if (cfg.field === 'experience') {
+				addExperience({ company: '', position: '', date: '', details: html })
+			} else if (cfg.field === 'projects') {
+				addProject({ name: '', role: '', date: '', description: html })
+			} else if (cfg.field === 'education') {
+				addEducation({ school: '', major: '', degree: '', startDate: '', endDate: '', description: html })
 			}
-		},
-
-		loadFromLocal() {
-			try {
-				const raw = uni.getStorageSync(STORAGE_KEY)
-				if (!raw) return false
-				const data = typeof raw === 'string' ? JSON.parse(raw) : raw
-				if (data?.resumes) {
-					this.$patch((state) => {
-						state.resumes = data.resumes
-						state.activeResumeId = data.activeResumeId || null
-					})
-					return true
-				}
-			} catch (e) {
-				console.error('加载简历失败:', e)
+			return
+		}
+		if (moduleId.startsWith('custom') || moduleId === 'certificates') {
+			const items = activeResume.value.customData?.[moduleId] || []
+			if (items.length) {
+				updateCustomItem(moduleId, items[0].id, { description: html })
+			} else {
+				addCustomItem(moduleId, { title: '', description: html })
 			}
-			return false
-		},
-	},
+		}
+	}
+
+	// ════════════════════════════════════════════════════════════════
+	// 4. 持久化 —— deep watch + debounce，业务代码完全无感
+	// ════════════════════════════════════════════════════════════════
+	let saveTimer = null
+	let hydrated = false
+
+	function _performSave() {
+		try {
+			uni.setStorageSync(STORAGE_KEY, JSON.stringify({
+				resumes: JSON.parse(JSON.stringify(resumes)),
+				activeResumeId: activeResumeId.value,
+			}))
+		} catch (e) {
+			console.error('保存简历失败:', e)
+		}
+	}
+
+	function scheduleSave() {
+		if (!hydrated) return
+		if (saveTimer) clearTimeout(saveTimer)
+		saveTimer = setTimeout(() => {
+			saveTimer = null
+			_performSave()
+		}, SAVE_DEBOUNCE_MS)
+	}
+
+	// 任何字段变化都触发 debounced 保存
+	watch([resumes, activeResumeId], scheduleSave, { deep: true })
+
+	function saveToLocal() {
+		if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+		_performSave()
+	}
+
+	function flushSave() { saveToLocal() }
+
+	function loadFromLocal() {
+		try {
+			const raw = uni.getStorageSync(STORAGE_KEY)
+			if (!raw) { hydrated = true; return false }
+			const data = typeof raw === 'string' ? JSON.parse(raw) : raw
+			if (data?.resumes) {
+				Object.keys(resumes).forEach((k) => { delete resumes[k] })
+				Object.entries(data.resumes).forEach(([id, r]) => { resumes[id] = r })
+				activeResumeId.value = data.activeResumeId || null
+				hydrated = true
+				return true
+			}
+		} catch (e) {
+			console.error('加载简历失败:', e)
+		}
+		hydrated = true
+		return false
+	}
+
+	return {
+		// state
+		resumes,
+		activeResumeId,
+		// computed
+		activeResume,
+		allResumes,
+		// resume lifecycle
+		createResume,
+		addResume,
+		deleteResume,
+		setActiveResume,
+		updateResume,
+		updateResumeTitle,
+		// section management
+		setActiveSection,
+		setTemplateId,
+		updateMenuSections,
+		removeMenuSection,
+		toggleSectionVisibility,
+		reorderSections,
+		updateGlobalSettings,
+		setThemeColor,
+		// list CRUD
+		addExperience, deleteExperience, reorderExperience, updateExperience,
+		addProject,    deleteProject,    reorderProjects,   updateProject,
+		addEducation,  deleteEducation,  reorderEducation,  updateEducation,
+		// rich text top-level
+		updateBasicInfo,
+		updateSkillContent,
+		updateSelfEvaluation,
+		// custom modules
+		updateCustomSection,
+		addCustomItem,
+		updateCustomItem,
+		deleteCustomItem,
+		reorderCustomItems,
+		// AI
+		applyOptimizedModule,
+		// persistence
+		saveToLocal,
+		flushSave,
+		loadFromLocal,
+	}
 })
