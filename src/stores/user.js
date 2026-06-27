@@ -138,6 +138,17 @@ export const useUserStore = defineStore('user', () => {
 	}
 
 	/**
+	 * 清除登录状态（token 过期或主动退出时调用）
+	 */
+	const clearAuth = () => {
+		token.value = ''
+		userInfo.value = null
+		isLogin.value = false
+		uni.removeStorageSync('token')
+		uni.removeStorageSync('userInfo')
+	}
+
+	/**
 	 * 退出登录
 	 * POST /api/v1/user/logout
 	 */
@@ -151,21 +162,11 @@ export const useUserStore = defineStore('user', () => {
 					'Authorization': `Bearer ${token.value}`
 				},
 				success: () => {
-					// 清除本地状态
-					token.value = ''
-					userInfo.value = null
-					isLogin.value = false
-					uni.removeStorageSync('token')
-					uni.removeStorageSync('userInfo')
+					clearAuth()
 					resolve({ success: true })
 				},
 				fail: () => {
-					// 即使请求失败也清除本地状态
-					token.value = ''
-					userInfo.value = null
-					isLogin.value = false
-					uni.removeStorageSync('token')
-					uni.removeStorageSync('userInfo')
+					clearAuth()
 					resolve({ success: true })
 				}
 			})
@@ -186,6 +187,12 @@ export const useUserStore = defineStore('user', () => {
 					'Authorization': `Bearer ${token.value}`
 				},
 				success: (res) => {
+					if (res.statusCode === 401) {
+						clearAuth()
+						uni.$emit('token-expired')
+						resolve({ success: false, message: '登录已过期' })
+						return
+					}
 					if (res.statusCode === 200 && res.data.code === 0) {
 						const data = res.data.data
 						userInfo.value = {
@@ -245,6 +252,7 @@ export const useUserStore = defineStore('user', () => {
 		login,
 		register,
 		logout,
+		clearAuth,
 		fetchUserInfo,
 		checkLogin,
 		updateUserInfo

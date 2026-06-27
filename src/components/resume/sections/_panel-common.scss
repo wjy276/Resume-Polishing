@@ -4,30 +4,108 @@
 }
 
 .form-group {
-	padding: 10px 16px 0;
+	padding: 12px 16px 0;
 }
 
 .form-label {
 	display: block;
-	font-size: 12px;
+	font-size: 13px;
 	color: #6b7280;
-	margin-bottom: 5px;
+	margin-bottom: 6px;
 	font-weight: 500;
+	line-height: 1.4;
 }
 
+/* 单行输入：统一高度与行高，避免文字贴边或被裁切 */
 .form-input {
 	width: 100%;
-	padding: 7px 10px;
+	min-height: 40px;
+	padding: 10px 12px;
 	border: 1px solid #e5e7eb;
-	border-radius: 6px;
-	font-size: 13px;
+	border-radius: 8px;
+	font-size: 14px;
+	line-height: 1.45;
 	color: #111827;
 	background: #fff;
 	box-sizing: border-box;
-	transition: border-color 0.15s;
+	font-family: inherit;
+	transition: border-color 0.15s, box-shadow 0.15s;
 	outline: none;
+	-webkit-appearance: none;
+	appearance: none;
 
-	&:focus { border-color: #2563eb; }
+	&::placeholder {
+		color: #9ca3af;
+		line-height: 1.45;
+	}
+
+	&:focus {
+		border-color: #60a5fa;
+		box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12);
+	}
+}
+
+/* 月份选择器与文本输入等高 */
+.form-input.date-input,
+input.form-input[type='month'] {
+	min-height: 40px;
+	padding: 9px 12px;
+	line-height: 1.45;
+}
+
+/* 日期区间行：与加高后的输入框垂直居中 */
+.date-range-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+
+	.date-input {
+		flex: 1;
+		min-width: 0;
+	}
+}
+
+.date-sep {
+	font-size: 14px;
+	color: #9ca3af;
+	flex-shrink: 0;
+	line-height: 1;
+}
+
+.current-badge {
+	font-size: 13px;
+	color: #2563eb;
+	background: #eff6ff;
+	border-radius: 6px;
+	padding: 8px 12px;
+	white-space: nowrap;
+	flex-shrink: 0;
+	line-height: 1.45;
+	min-height: 40px;
+	box-sizing: border-box;
+	display: inline-flex;
+	align-items: center;
+}
+
+.current-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+	color: #6b7280;
+	cursor: pointer;
+	white-space: nowrap;
+	flex-shrink: 0;
+	min-height: 40px;
+	line-height: 1.45;
+
+	input[type='checkbox'] {
+		width: 15px;
+		height: 15px;
+		cursor: pointer;
+		accent-color: #2563eb;
+	}
 }
 
 .form-textarea {
@@ -154,18 +232,33 @@
 }
 
 .item-card-body {
-	padding: 10px 12px 12px;
+	padding: 12px 14px 14px;
 	border-top: 1px solid #e5e7eb;
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 10px;
+	overflow: visible;
+}
+
+/* 富文本编辑器：占满宽度，避免被卡片裁切 */
+.editor-group {
+	padding-bottom: 4px;
+
+	:deep(.rich-editor) {
+		width: 100%;
+	}
 }
 
 .field-row {
 	display: flex;
-	gap: 8px;
+	gap: 10px;
+	align-items: flex-start;
 
-	.form-group { flex: 1; padding: 0; }
+	.form-group {
+		flex: 1;
+		padding: 0;
+		min-width: 0;
+	}
 }
 
 .add-item-btn {

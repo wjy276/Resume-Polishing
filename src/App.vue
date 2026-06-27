@@ -1,11 +1,28 @@
 <template>
 	<view class="app-container">
 		<slot />
+		<TokenExpiredPopup
+			:visible="showExpiredPopup"
+			@update:visible="showExpiredPopup = $event"
+			@confirm="showExpiredPopup = false"
+			@cancel="showExpiredPopup = false"
+		/>
 	</view>
 </template>
 
 <script setup>
-// App.vue 只作为全局容器，不处理业务逻辑
+import { ref } from 'vue'
+import { onLaunch } from '@dcloudio/uni-app'
+import TokenExpiredPopup from '@/components/TokenExpiredPopup/TokenExpiredPopup.vue'
+
+const showExpiredPopup = ref(false)
+
+onLaunch(() => {
+	uni.$on('token-expired', () => {
+		showExpiredPopup.value = true
+	})
+})
+
 console.log('App.vue 已加载')
 </script>
 

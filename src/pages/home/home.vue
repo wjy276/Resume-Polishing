@@ -24,10 +24,11 @@
 						<text class="bell-icon">🔔</text>
 						<view class="badge">3</view>
 					</view>
-					<image 
-						src="https://java-ai-wrm.oss-cn-beijing.aliyuncs.com/2026/03/26b32fb2-0452-4117-9605-a90087ffb85c.png" 
-						class="user-avatar" 
+					<image
+						:src="displayAvatar"
+						class="user-avatar"
 						mode="aspectFill"
+						@error="onAvatarError"
 					/>
 				</view>
 			</view>
@@ -120,10 +121,32 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
+import { useUserStore } from '@/stores/user'
+import { DEFAULT_AVATAR, resolveAvatar } from '@/utils/avatar'
+
+const userStore = useUserStore()
+const { userInfo, isLogin } = storeToRefs(userStore)
 
 const searchKeyword = ref('')
+const avatarLoadFailed = ref(false)
+
+const userAvatar = computed(() =>
+	resolveAvatar(isLogin.value ? userInfo.value?.avatar : '')
+)
+const displayAvatar = computed(() =>
+	avatarLoadFailed.value ? DEFAULT_AVATAR : userAvatar.value
+)
+
+watch(userAvatar, () => {
+	avatarLoadFailed.value = false
+})
+
+function onAvatarError() {
+	avatarLoadFailed.value = true
+}
 
 const startExplore = () => {
 	console.log('开始探索')

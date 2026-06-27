@@ -25,10 +25,11 @@
 					<label class="form-label">获得时间</label>
 					<input class="form-input" v-model.trim="cert.date" placeholder="如 2023-06" />
 				</div>
-				<div class="form-group">
+				<div class="form-group editor-group">
 					<label class="form-label">补充说明</label>
 					<RichTextEditor
 						v-model="cert.description"
+						:min-height="168"
 						placeholder="可填写证书相关说明..."
 					/>
 				</div>

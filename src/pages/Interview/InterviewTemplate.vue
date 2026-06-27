@@ -105,7 +105,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { onShow, onHide, onLoad } from '@dcloudio/uni-app'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
-import { request } from '@/stores/user.js'
+import { request } from '@/utils/http.js'
 
 // 面试状态
 const isInterviewActive = ref(true)

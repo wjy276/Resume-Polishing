@@ -10,10 +10,19 @@
 
 import { defineStore } from 'pinia'
 import { ref, reactive, computed, watch } from 'vue'
-import { createNewResume, generateId } from '@/utils/resume/initialData'
+import { createBlankResume, createNewResume, generateId } from '@/utils/resume/initialData'
+import { toApiPayload, fromApiResponse, mergeMenuSections, mergeResumeWithDraft } from '@/utils/resume/serializer'
+import {
+	fetchResumeList,
+	fetchResumeDetail,
+	createResumeApi,
+	updateResumeApi,
+	deleteResumeApi,
+} from '@/api/resume'
 
 const STORAGE_KEY = 'magic_resume_store'
-const SAVE_DEBOUNCE_MS = 300
+const SAVE_DEBOUNCE_MS = 800
+const API_SAVE_DEBOUNCE_MS = 1200
 
 // AI 优化结果回写时用的模块字段映射
 export const SECTION_FIELD_MAP = {
@@ -30,6 +39,9 @@ export const useResumeStore = defineStore('resume', () => {
 	// ════════════════════════════════════════════════════════════════
 	const resumes = reactive({}) // { [id]: ResumeData }
 	const activeResumeId = ref(null)
+	const listLoading = ref(false)
+	const saving = ref(false)
+	const syncError = ref('')
 
 	// ════════════════════════════════════════════════════════════════
 	// 2. 派生
@@ -52,11 +64,171 @@ export const useResumeStore = defineStore('resume', () => {
 	// 3. CRUD —— 只做"新增/删除/切换"这种不能用 v-model 解决的事
 	//    具体字段的修改全部交给 v-model 直接干，store 不再写一堆 update*
 	// ════════════════════════════════════════════════════════════════
+	function _hasToken() {
+		return !!uni.getStorageSync('token')
+	}
+
+	function _replaceAllResumes(list) {
+		Object.keys(resumes).forEach((k) => { delete resumes[k] })
+		for (const r of list) {
+			if (r?.id) resumes[r.id] = r
+		}
+	}
+
+	function _normalizeResumeMenu(resume) {
+		if (!resume) return resume
+		if (resume.menuSections?.length) {
+			resume.menuSections = mergeMenuSections(resume.menuSections)
+		}
+		return resume
+	}
+
+	function _upsertResume(resume) {
+		if (!resume?.id) return
+		resumes[resume.id] = _normalizeResumeMenu(resume)
+	}
+
+	/** 仅本地创建（未登录降级） */
 	function createResume(overrides = {}) {
 		const r = createNewResume(overrides)
 		resumes[r.id] = r
 		activeResumeId.value = r.id
 		return r.id
+	}
+
+	/** 从后端拉取简历列表 */
+	async function fetchAllFromServer() {
+		if (!_hasToken()) {
+			loadFromLocal()
+			return { success: false, message: '请先登录' }
+		}
+
+		listLoading.value = true
+		syncError.value = ''
+		hydrated = false
+
+		try {
+			const res = await fetchResumeList({ pageNum: 1, pageSize: 100 })
+			if (!res.ok) {
+				syncError.value = res.message || '加载失败'
+				loadFromLocal()
+				return { success: false, message: syncError.value }
+			}
+
+			const records = res.data?.records || (Array.isArray(res.data) ? res.data : [])
+			const mapped = records
+				.map((row) => fromApiResponse(row))
+				.filter(Boolean)
+
+			_replaceAllResumes(mapped)
+			if (!activeResumeId.value && mapped.length) {
+				activeResumeId.value = mapped[0].id
+			}
+			_performSave()
+			hydrated = true
+			return { success: true, count: mapped.length }
+		} catch (e) {
+			console.error('fetchAllFromServer:', e)
+			syncError.value = '加载简历失败'
+			loadFromLocal()
+			return { success: false, message: syncError.value }
+		} finally {
+			listLoading.value = false
+		}
+	}
+
+	/** 创建简历并同步到后端 */
+	async function createResumeOnServer(overrides = {}) {
+		const draft = createBlankResume({
+			title: overrides.title || `新建简历 ${Object.keys(resumes).length + 1}`,
+			templateId: overrides.templateId || 'classic',
+			...overrides,
+		})
+
+		if (!_hasToken()) {
+			const id = createResume(overrides)
+			uni.showToast({ title: '未登录，已仅存本地', icon: 'none' })
+			return { success: true, id }
+		}
+
+		listLoading.value = true
+		syncError.value = ''
+		try {
+			const payload = toApiPayload(draft)
+			const res = await createResumeApi(payload)
+			if (!res.ok) {
+				syncError.value = res.message || '创建失败'
+				uni.showToast({ title: syncError.value, icon: 'none' })
+				return { success: false, message: syncError.value }
+			}
+
+			let created = fromApiResponse(res.data, {
+				templateId: draft.templateId,
+				menuSections: draft.menuSections,
+				globalSettings: draft.globalSettings,
+			})
+
+			// 部分接口只返回 resumeId，再拉一次详情
+			if (!created && res.data?.resumeId) {
+				const detailRes = await fetchResumeDetail(res.data.resumeId)
+				if (detailRes.ok) {
+					created = fromApiResponse(detailRes.data, {
+						templateId: draft.templateId,
+						menuSections: draft.menuSections,
+						globalSettings: draft.globalSettings,
+					})
+				}
+			}
+			if (!created && typeof res.data === 'string') {
+				const detailRes = await fetchResumeDetail(res.data)
+				if (detailRes.ok) created = fromApiResponse(detailRes.data)
+			}
+
+			if (!created) {
+				return { success: false, message: '创建成功但数据解析失败' }
+			}
+
+			_upsertResume(mergeResumeWithDraft(draft, created))
+			activeResumeId.value = created.id
+			_performSave()
+			hydrated = true
+			return { success: true, id: created.id }
+		} catch (e) {
+			console.error('createResumeOnServer:', e)
+			syncError.value = '创建简历失败'
+			return { success: false, message: syncError.value }
+		} finally {
+			listLoading.value = false
+		}
+	}
+
+	/** 拉取单份简历详情（进入编辑器前） */
+	async function loadResumeFromServer(resumeId) {
+		if (!resumeId) return { success: false }
+		if (!_hasToken()) {
+			if (resumes[resumeId]) {
+				activeResumeId.value = resumeId
+				return { success: true }
+			}
+			return { success: false, message: '简历不存在' }
+		}
+
+		try {
+			const res = await fetchResumeDetail(resumeId)
+			if (!res.ok) {
+				return { success: false, message: res.message || '加载失败' }
+			}
+			const local = resumes[resumeId]
+			const resume = fromApiResponse(res.data, local || {})
+			if (!resume) return { success: false, message: '数据解析失败' }
+			_upsertResume(local ? mergeResumeWithDraft(local, resume) : resume)
+			activeResumeId.value = resumeId
+			_performSave()
+			return { success: true }
+		} catch (e) {
+			console.error('loadResumeFromServer:', e)
+			return { success: false, message: '加载失败' }
+		}
 	}
 
 	function addResume(resumeData) {
@@ -72,6 +244,29 @@ export const useResumeStore = defineStore('resume', () => {
 			const left = Object.keys(resumes)
 			activeResumeId.value = left.length ? left[0] : null
 		}
+	}
+
+	async function deleteResumeOnServer(id) {
+		if (!resumes[id]) {
+			return { success: false, message: '简历不存在' }
+		}
+
+		if (_hasToken()) {
+			try {
+				const res = await deleteResumeApi(id)
+				if (!res.ok) {
+					return { success: false, message: res.message || '删除失败' }
+				}
+			} catch (error) {
+				console.error('删除简历失败:', error)
+				return { success: false, message: '删除失败，请重试' }
+			}
+		}
+
+		// 删除本地数据
+		deleteResume(id)
+		_performSave()
+		return { success: true }
 	}
 
 	function setActiveResume(id) {
@@ -295,7 +490,44 @@ export const useResumeStore = defineStore('resume', () => {
 	// 4. 持久化 —— deep watch + debounce，业务代码完全无感
 	// ════════════════════════════════════════════════════════════════
 	let saveTimer = null
+	let apiSaveTimer = null
 	let hydrated = false
+	let apiSaveInFlight = false
+
+	async function _saveActiveToServer() {
+		const r = activeResume.value
+		if (!r?.id || !_hasToken() || apiSaveInFlight) return
+
+		apiSaveInFlight = true
+		saving.value = true
+		try {
+			const res = await updateResumeApi(r.id, toApiPayload(r))
+			if (!res.ok) {
+				syncError.value = res.message || '保存失败'
+				console.warn('简历保存失败:', res.message)
+			} else {
+				syncError.value = ''
+				const updated = fromApiResponse(res.data)
+				if (updated) {
+					resumes[r.id] = mergeResumeWithDraft(r, { ...updated, id: r.id })
+				}
+			}
+		} catch (e) {
+			console.error('_saveActiveToServer:', e)
+		} finally {
+			apiSaveInFlight = false
+			saving.value = false
+		}
+	}
+
+	function scheduleApiSave() {
+		if (!hydrated || !_hasToken() || !activeResumeId.value) return
+		if (apiSaveTimer) clearTimeout(apiSaveTimer)
+		apiSaveTimer = setTimeout(() => {
+			apiSaveTimer = null
+			_saveActiveToServer()
+		}, API_SAVE_DEBOUNCE_MS)
+	}
 
 	function _performSave() {
 		try {
@@ -315,9 +547,10 @@ export const useResumeStore = defineStore('resume', () => {
 			saveTimer = null
 			_performSave()
 		}, SAVE_DEBOUNCE_MS)
+		scheduleApiSave()
 	}
 
-	// 任何字段变化都触发 debounced 保存
+	// 任何字段变化都触发 debounced 本地 + 远端保存
 	watch([resumes, activeResumeId], scheduleSave, { deep: true })
 
 	function saveToLocal() {
@@ -325,7 +558,14 @@ export const useResumeStore = defineStore('resume', () => {
 		_performSave()
 	}
 
-	function flushSave() { saveToLocal() }
+	function flushSave() {
+		saveToLocal()
+		if (apiSaveTimer) {
+			clearTimeout(apiSaveTimer)
+			apiSaveTimer = null
+		}
+		return _saveActiveToServer()
+	}
 
 	function loadFromLocal() {
 		try {
@@ -334,7 +574,9 @@ export const useResumeStore = defineStore('resume', () => {
 			const data = typeof raw === 'string' ? JSON.parse(raw) : raw
 			if (data?.resumes) {
 				Object.keys(resumes).forEach((k) => { delete resumes[k] })
-				Object.entries(data.resumes).forEach(([id, r]) => { resumes[id] = r })
+				Object.entries(data.resumes).forEach(([id, r]) => {
+					resumes[id] = _normalizeResumeMenu(r)
+				})
 				activeResumeId.value = data.activeResumeId || null
 				hydrated = true
 				return true
@@ -350,13 +592,20 @@ export const useResumeStore = defineStore('resume', () => {
 		// state
 		resumes,
 		activeResumeId,
+		listLoading,
+		saving,
+		syncError,
 		// computed
 		activeResume,
 		allResumes,
 		// resume lifecycle
 		createResume,
+		createResumeOnServer,
+		fetchAllFromServer,
+		loadResumeFromServer,
 		addResume,
 		deleteResume,
+		deleteResumeOnServer,
 		setActiveResume,
 		updateResume,
 		updateResumeTitle,
@@ -389,5 +638,6 @@ export const useResumeStore = defineStore('resume', () => {
 		saveToLocal,
 		flushSave,
 		loadFromLocal,
+		saveActiveToServer: _saveActiveToServer,
 	}
 })

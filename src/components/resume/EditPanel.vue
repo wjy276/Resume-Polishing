@@ -15,8 +15,13 @@
 				/>
 			</div>
 
-		<!-- 分区内容 -->
-		<component :is="currentPanel" v-if="currentPanel" v-bind="currentPanelProps" />
+		<!-- 分区内容（key 强制在切换模块时重新挂载对应面板） -->
+		<component
+			:is="currentPanel"
+			v-if="currentPanel"
+			:key="activeSection"
+			v-bind="currentPanelProps"
+		/>
 		</template>
 	</div>
 </template>
@@ -25,12 +30,13 @@
 import { computed, defineAsyncComponent } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useResumeStore } from '@/stores/resume'
+import { mergeMenuSections } from '@/utils/resume/serializer'
 
 const store = useResumeStore()
 const { activeResume } = storeToRefs(store)
 const activeSection = computed(() => activeResume.value?.activeSection || 'basic')
 const currentSection = computed(() =>
-	(activeResume.value?.menuSections || []).find(s => s.id === activeSection.value)
+	mergeMenuSections(activeResume.value?.menuSections || []).find(s => s.id === activeSection.value)
 )
 
 const panelMap = {
@@ -108,14 +114,22 @@ function renameSection(title) {
 
 .section-name-input {
 	flex: 1;
+	min-height: 40px;
+	padding: 8px 10px;
 	font-size: 16px;
 	font-weight: 600;
+	line-height: 1.45;
 	color: #2563eb;
-	border: none;
+	border: 1px solid transparent;
+	border-radius: 8px;
 	outline: none;
 	background: transparent;
-	border-bottom: 1px solid transparent;
+	box-sizing: border-box;
+	transition: border-color 0.15s, background 0.15s;
 
-	&:focus { border-bottom-color: #2563eb; }
+	&:focus {
+		border-color: #bfdbfe;
+		background: #f8fafc;
+	}
 }
 </style>

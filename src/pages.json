@@ -43,12 +43,6 @@
 			}
 		},
 		{
-			"path": "pages/Resume/ResumeTemplate",
-			"style": {
-				"navigationBarTitleText": "ResumeTemplate"
-			}
-		},
-		{
 			"path": "pages/Interview/InterviewTemplate",
 			"style": {
 				"navigationBarTitleText": "InterviewTemplate"
@@ -61,22 +55,10 @@
 			}
 		},
 		{
-			"path": "pages/Resume/ResumeTemplateChooce",
-			"style": {
-				"navigationBarTitleText": "ResumeTemplateChooce"
-			}
-		},
-		{
 			"path": "pages/Resume/ResumeEditor",
 			"style": {
 				"navigationBarTitleText": "编辑简历",
 				"navigationStyle": "custom"
-			}
-		},
-		{
-			"path": "pages/Resume/ResumePreview",
-			"style": {
-				"navigationBarTitleText": "预览简历"
 			}
 		}
 	],

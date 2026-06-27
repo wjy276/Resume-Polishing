@@ -224,13 +224,21 @@
 import { ref, computed } from 'vue'
 import { useResumeStore } from '@/stores/resume'
 import { THEME_COLORS, STANDARD_MODULES } from '@/utils/resume/initialData'
+import { normalizeMenuSection, mergeMenuSections } from '@/utils/resume/serializer'
 
 const store = useResumeStore()
 const showAddPopup = ref(false)
 
 const gs = computed(() => store.activeResume?.globalSettings || {})
 const themeColor = computed(() => gs.value.themeColor || '#000000')
-const menuSections = computed(() => store.activeResume?.menuSections || [])
+// 仅展示简历已有的模块（不补全默认列表），让「添加模块」弹窗负责提供未添加的模块
+const menuSections = computed(() => {
+	const sections = store.activeResume?.menuSections || []
+	return sections
+		.map(normalizeMenuSection)
+		.filter(Boolean)
+		.sort((a, b) => a.order - b.order)
+})
 const activeSection = computed(() => store.activeResume?.activeSection || '')
 
 const fontOptions = [
@@ -262,7 +270,8 @@ const vClickOutside = {
 
 function selectSection(id) {
 	const target = menuSections.value.find((section) => section.id === id)
-	if (!target?.enabled) return
+	if (!target) return
+	// enabled 仅控制预览区是否展示，编辑区始终允许切换以便填写内容
 	store.setActiveSection(id)
 }
 function toggleVisibility(id) { store.toggleSectionVisibility(id) }

@@ -340,7 +340,7 @@ function removeCustomField(index) {
 	padding: 5px 0;
 	border-bottom: 1px solid #f9fafb;
 	&:last-child { border-bottom: none; }
-	.form-input { flex: 1; height: inherit; }
+	.form-input { flex: 1; min-height: 40px; }
 }
 
 .field-row-label {

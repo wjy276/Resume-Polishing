@@ -29,12 +29,17 @@
 					<label class="form-label">项目链接</label>
 					<input class="form-input" v-model.trim="proj.link" placeholder="https://..." />
 				</div>
-				<div class="form-group">
+				<div class="form-group editor-group">
 					<label class="form-label">项目描述</label>
 					<RichTextEditor
 						v-model="proj.description"
+						:min-height="192"
 						placeholder="描述项目背景、你的产出与量化成果..."
 					/>
+					<button class="ai-optimize-btn" @click.stop="handleAIOptimize(proj.id)">
+						<svg viewBox="0 0 16 16" fill="none"><path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+						AI 优化
+					</button>
 				</div>
 			</div>
 		</div>
@@ -45,9 +50,11 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useResumeStore } from '@/stores/resume'
+import { useAIOptimizeStore } from '@/stores/aiOptimize'
 import RichTextEditor from '@/components/resume/RichTextEditor.vue'
 
 const store = useResumeStore()
+const aiStore = useAIOptimizeStore()
 const list = computed(() => store.activeResume?.projects || [])
 const expanded = ref(null)
 
@@ -56,6 +63,11 @@ function toggle(id) { expanded.value = expanded.value === id ? null : id }
 function addItem() {
 	const id = store.addProject({ name: '', role: '', date: '', description: '', link: '' })
 	if (id) expanded.value = id
+}
+
+function handleAIOptimize(itemId) {
+	aiStore.openPanel()
+	aiStore.goToStep('optimize')
 }
 </script>
 
@@ -72,5 +84,25 @@ function addItem() {
 	border: none; background: none; border-radius: 4px; cursor: pointer;
 	font-size: 12px; color: #6b7280;
 	&:hover { background: #f3f4f6; color: #111827; }
+}
+
+.ai-optimize-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	margin-top: 10px;
+	padding: 8px 14px;
+	background: linear-gradient(135deg, #3b82f6, #2563eb);
+	color: #fff;
+	border: none;
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: opacity 0.15s;
+
+	svg { width: 14px; height: 14px; }
+	&:hover { opacity: 0.9; }
 }
 </style>

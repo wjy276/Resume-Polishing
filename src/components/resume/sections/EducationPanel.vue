@@ -58,8 +58,13 @@
 					<label class="form-label">在校经历</label>
 					<RichTextEditor
 						v-model="edu.description"
+						:min-height="192"
 						placeholder="可填写在校获奖、社团经历、主修课程等..."
 					/>
+					<button class="ai-optimize-btn" @click.stop="handleAIOptimize(edu.id)">
+						<svg viewBox="0 0 16 16" fill="none"><path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+						AI 优化
+					</button>
 				</div>
 			</div>
 		</div>
@@ -73,9 +78,11 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useResumeStore } from '@/stores/resume'
+import { useAIOptimizeStore } from '@/stores/aiOptimize'
 import RichTextEditor from '@/components/resume/RichTextEditor.vue'
 
 const store = useResumeStore()
+const aiStore = useAIOptimizeStore()
 const list = computed(() => store.activeResume?.education || [])
 const expanded = ref(null)
 
@@ -92,6 +99,11 @@ function addItem() {
 function onToggleCurrent(edu, checked) {
 	edu.isCurrent = checked
 	if (checked) edu.endDate = ''
+}
+
+function handleAIOptimize(itemId) {
+	aiStore.openPanel()
+	aiStore.goToStep('optimize')
 }
 </script>
 
@@ -119,21 +131,6 @@ function onToggleCurrent(edu, checked) {
 	&:hover { background: #f3f4f6; color: #111827; }
 	&.del { color: #ef4444; &:hover { background: #fef2f2; } }
 }
-.date-range-row {
-	display: flex; align-items: center; gap: 6px;
-	.date-input { flex: 1; min-width: 0; }
-}
-.date-sep { font-size: 14px; color: #9ca3af; flex-shrink: 0; }
-.current-badge {
-	font-size: 12px; color: #2563eb; background: #eff6ff;
-	border-radius: 4px; padding: 4px 8px; white-space: nowrap; flex-shrink: 0;
-}
-.current-toggle {
-	display: flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280;
-	cursor: pointer; white-space: nowrap; flex-shrink: 0;
-	input[type="checkbox"] { cursor: pointer; accent-color: #2563eb; }
-}
-.editor-group { padding-bottom: 0; }
 .add-block-btn {
 	display: flex; align-items: center; justify-content: center; gap: 6px;
 	margin: 12px 16px; width: calc(100% - 32px); padding: 10px;
@@ -141,5 +138,25 @@ function onToggleCurrent(edu, checked) {
 	font-size: 13px; cursor: pointer; transition: background 0.15s;
 	svg { width: 13px; height: 13px; }
 	&:hover { background: #374151; }
+}
+
+.ai-optimize-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	margin-top: 10px;
+	padding: 8px 14px;
+	background: linear-gradient(135deg, #3b82f6, #2563eb);
+	color: #fff;
+	border: none;
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: opacity 0.15s;
+
+	svg { width: 14px; height: 14px; }
+	&:hover { opacity: 0.9; }
 }
 </style>

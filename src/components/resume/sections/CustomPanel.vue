@@ -25,9 +25,13 @@
 					<label class="form-label">起止时间</label>
 					<input class="form-input" v-model.trim="item.dateRange" placeholder="如 2022-01 - 至今" />
 				</div>
-				<div class="form-group">
+				<div class="form-group editor-group">
 					<label class="form-label">描述</label>
-					<RichTextEditor v-model="item.description" placeholder="详细描述..." />
+					<RichTextEditor
+						v-model="item.description"
+						:min-height="192"
+						placeholder="详细描述..."
+					/>
 				</div>
 			</div>
 		</div>

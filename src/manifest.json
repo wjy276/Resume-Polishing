@@ -74,7 +74,7 @@
         "devServer" : {
             "proxy" : {
                 "/api" : {
-                    "target" : "http://81.71.75.85:8080",
+                    "target" : "http://81.71.75.85:6008",
                     "changeOrigin" : true,
                     "secure" : false
                 }

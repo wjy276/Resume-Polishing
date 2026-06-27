@@ -51,9 +51,10 @@
 		<view class="user-info" @click="handleUserClick">
 			<view class="avatar-wrapper">
 				<image
-					:src="userAvatar"
+					:src="displayAvatar"
 					mode="aspectFill"
 					class="avatar-image"
+					@error="onAvatarError"
 				/>
 				<view class="avatar-details">
 					<text class="name">{{ userName }}</text>
@@ -73,8 +74,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import LoginPopup from '@/components/LoginPopup/LoginPopup.vue'
+import { DEFAULT_AVATAR, resolveAvatar } from '@/utils/avatar'
 
 // 登录弹窗状态
 const showLoginPopup = ref(false)
@@ -114,12 +116,23 @@ const userMajor = computed(() => {
 	return '点击登录账号'
 })
 
-const userAvatar = computed(() => {
-	if (isLogin.value && userInfo.value?.avatar) {
-		return userInfo.value.avatar
-	}
-	return 'https://java-ai-wrm.oss-cn-beijing.aliyuncs.com/2026/03/26b32fb2-0452-4117-9605-a90087ffb85c.png'
+const avatarLoadFailed = ref(false)
+
+const userAvatar = computed(() =>
+	resolveAvatar(isLogin.value ? userInfo.value?.avatar : '')
+)
+
+const displayAvatar = computed(() =>
+	avatarLoadFailed.value ? DEFAULT_AVATAR : userAvatar.value
+)
+
+watch(userAvatar, () => {
+	avatarLoadFailed.value = false
 })
+
+function onAvatarError() {
+	avatarLoadFailed.value = true
+}
 
 // 加载文字配置
 const loadingTexts = {

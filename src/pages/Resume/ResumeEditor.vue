@@ -37,6 +37,14 @@
 					placeholder="简历名称"
 					:key="activeResume?.id"
 				/>
+				<button class="ai-optimize-btn" @click="openAIPanel">
+					<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+					<span class="ai-label">AI 优化</span>
+				</button>
+				<button class="save-template-btn" @click="showSaveTemplate = true">
+					<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M2 2h9l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10 2v4H5V2M5 14v-4h6v4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+					<span class="template-label">存为模板</span>
+				</button>
 				<button class="export-btn" @click="exportPdf">
 					<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M8 2v9M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
 					<span class="export-label">导出 PDF</span>
@@ -115,6 +123,14 @@
 				</div>
 			</div>
 		</div>
+
+		<AIOptimizePanel />
+
+		<SaveAsTemplateDialog
+			v-model:visible="showSaveTemplate"
+			:resume-data="activeResume"
+			@saved="handleTemplateSaved"
+		/>
 	</div>
 </template>
 
@@ -123,14 +139,19 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { onLoad } from '@dcloudio/uni-app'
 import { useResumeStore } from '@/stores/resume'
+import { useAIOptimizeStore } from '@/stores/aiOptimize'
 import { createNewResume } from '@/utils/resume/initialData'
+import { normalizeMenuSection } from '@/utils/resume/serializer'
 import SidePanel from '@/components/resume/SidePanel.vue'
 import EditPanel from '@/components/resume/EditPanel.vue'
 import ClassicTemplate from '@/components/resume/ClassicTemplate.vue'
+import AIOptimizePanel from '@/components/AIOptimize/AIOptimizePanel.vue'
+import SaveAsTemplateDialog from '@/components/TemplateGallery/SaveAsTemplateDialog.vue'
 
 const A4_WIDTH_PX = 794   // 210mm at 96dpi
 
 const store = useResumeStore()
+const aiStore = useAIOptimizeStore()
 // storeToRefs ensures activeResume stays reactive and always reflects latest store state
 const { activeResume } = storeToRefs(store)
 
@@ -139,13 +160,15 @@ const editPanelCollapsed = ref(false)
 const previewPanelRef = ref(null)
 const previewScrollRef = ref(null)
 const manualScale = ref(null)  // null = auto-fit
+const showSaveTemplate = ref(false)
 
 const resumeTitle = computed(() => activeResume.value?.title || '未命名简历')
 const activeSection = computed(() => activeResume.value?.activeSection || 'basic')
 
 const visibleSections = computed(() =>
 	(activeResume.value?.menuSections || [])
-		.filter(s => s.enabled)
+		.map(s => normalizeMenuSection(s))
+		.filter(s => s && s.enabled)
 		.sort((a, b) => a.order - b.order)
 )
 
@@ -216,40 +239,81 @@ onMounted(() => {
 	if (window.innerWidth < 900) editPanelCollapsed.value = true
 })
 
-onUnmounted(() => {
-	resizeObs?.disconnect()
-})
-
 // ── onLoad ────────────────────────────────────────────────────────
-onLoad((options) => {
-	const loaded = store.loadFromLocal()
+onLoad(async (options) => {
+	store.loadFromLocal()
 	const resumeId = options?.id
 	const templateId = options?.templateId
+	const aiOptimize = options?.aiOptimize
 
-	if (resumeId && store.resumes[resumeId]) {
+	if (resumeId) {
 		store.setActiveResume(resumeId)
-		return
-	}
-
-	if (!store.activeResume) {
-		if (!loaded || !Object.keys(store.resumes).length) {
-			const resume = createNewResume({ title: '我的简历' })
-			store.resumes[resume.id] = resume
-			store.activeResumeId = resume.id
-			store.saveToLocal()
+		const token = uni.getStorageSync('token')
+		if (token) {
+			const result = await store.loadResumeFromServer(resumeId)
+			if (!result.success && !store.resumes[resumeId]) {
+				uni.showToast({ title: result.message || '简历不存在', icon: 'none' })
+				setTimeout(() => goBack(), 1200)
+				return
+			}
+		} else if (!store.resumes[resumeId]) {
+			uni.showToast({ title: '简历不存在', icon: 'none' })
+			setTimeout(() => goBack(), 1200)
+			return
+		}
+	} else if (!store.activeResume) {
+		const keys = Object.keys(store.resumes)
+		if (keys.length) {
+			store.activeResumeId = keys[0]
 		} else {
-			store.activeResumeId = Object.keys(store.resumes)[0]
+			const result = await store.createResumeOnServer({ title: '我的简历' })
+			if (!result.success) {
+				const resume = createNewResume({ title: '我的简历' })
+				store.resumes[resume.id] = resume
+				store.activeResumeId = resume.id
+				store.saveToLocal()
+			}
 		}
 	}
 
 	if (templateId) {
 		store.setTemplateId(decodeURIComponent(templateId))
 	}
+
+	if (aiOptimize === '1') {
+		setTimeout(() => aiStore.openPanel(), 500)
+	}
+})
+
+onUnmounted(() => {
+	resizeObs?.disconnect()
+	store.flushSave()
 })
 
 // ── Navigation ───────────────────────────────────────────────────
 function goBack() {
 	uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/Resume/Resume' }) })
+}
+
+async function openAIPanel() {
+	if (!aiStore.sessionId && activeResume.value) {
+		uni.showLoading({ title: 'AI 准备中...' })
+		const res = await aiStore.initSession(true, '')
+		uni.hideLoading()
+		
+		if (res.success) {
+			const editorData = JSON.parse(JSON.stringify(activeResume.value))
+			aiStore.parsedResumeRaw = editorData
+			aiStore.parsedResumeForEditor = editorData
+			aiStore.parseConfirmed = true
+			aiStore.goToStep('career')
+		}
+	}
+	aiStore.openPanel()
+}
+
+function handleTemplateSaved() {
+	uni.showToast({ title: '模板已保存', icon: 'success' })
 }
 
 function handleTitleInput(e) {
@@ -421,17 +485,24 @@ ${el.innerHTML}
 }
 
 .title-input {
-	width: 160px;
-	padding: 5px 10px;
+	width: 168px;
+	min-height: 40px;
+	padding: 10px 12px;
 	border: 1px solid #e5e7eb;
-	border-radius: 6px;
-	font-size: 12.5px;
+	border-radius: 8px;
+	font-size: 14px;
+	line-height: 1.45;
 	color: #111827;
 	outline: none;
 	background: #f9fafb;
-	transition: border-color 0.15s, background 0.15s;
+	box-sizing: border-box;
+	transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 
-	&:focus { border-color: #93c5fd; background: #fff; }
+	&:focus {
+		border-color: #60a5fa;
+		background: #fff;
+		box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12);
+	}
 
 	@media (max-width: 768px) { display: none; }
 }
@@ -456,6 +527,54 @@ ${el.innerHTML}
 
 	@media (max-width: 640px) {
 		.export-label { display: none; }
+		padding: 6px 10px;
+	}
+}
+
+.ai-optimize-btn {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 6px 14px;
+	background: linear-gradient(135deg, #2563eb, #3b82f6);
+	color: #fff;
+	border: none;
+	border-radius: 7px;
+	font-size: 12.5px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: opacity 0.15s;
+	white-space: nowrap;
+
+	&:hover { opacity: 0.9; }
+	&:active { opacity: 0.8; }
+
+	@media (max-width: 640px) {
+		.ai-label { display: none; }
+		padding: 6px 10px;
+	}
+}
+
+.save-template-btn {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 6px 14px;
+	background: #fff;
+	color: #374151;
+	border: 1px solid #d1d5db;
+	border-radius: 7px;
+	font-size: 12.5px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.15s;
+	white-space: nowrap;
+
+	&:hover { background: #f9fafb; border-color: #9ca3af; }
+	&:active { background: #f3f4f6; }
+
+	@media (max-width: 640px) {
+		.template-label { display: none; }
 		padding: 6px 10px;
 	}
 }

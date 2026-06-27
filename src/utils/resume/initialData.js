@@ -145,3 +145,39 @@ export function createNewResume(overrides = {}) {
 		...overrides,
 	}
 }
+
+/** 空白简历：仅含基本信息模块，其余模块由用户按需添加 */
+export function createBlankResume(overrides = {}) {
+	const now = new Date().toISOString()
+	const base = JSON.parse(JSON.stringify(initialResumeState))
+	return {
+		...base,
+		id: generateId(),
+		createdAt: now,
+		updatedAt: now,
+		title: '新建简历',
+		// 仅保留 basic 一个模块，用户可在 SidePanel 中逐步添加其他模块
+		menuSections: [
+			{ id: 'basic', title: '基本信息', icon: '👤', enabled: true, order: 0 },
+		],
+		basic: {
+			...base.basic,
+			name: '',
+			title: '',
+			email: '',
+			phone: '',
+			location: '',
+			birthDate: '',
+			employementStatus: '',
+			photo: '',
+			customFields: [],
+		},
+		experience: [],
+		projects: [],
+		education: [],
+		skillContent: '',
+		selfEvaluationContent: '',
+		customData: {},
+		...overrides,
+	}
+}
