@@ -5,6 +5,7 @@
 				<div class="header-title">
 					<span class="title-icon">✨</span>
 					<span>AI 智能优化</span>
+					<span v-if="backendConnected !== null" class="status-dot" :class="{ online: backendConnected, offline: !backendConnected }" :title="backendConnected ? 'AI 服务已连接' : 'AI 服务未连接'"></span>
 				</div>
 				<button class="close-btn" @click="aiStore.closePanel()">
 					<svg viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -33,27 +34,43 @@
 			</div>
 
 			<div class="panel-content">
-				<div v-if="aiStore.error" class="error-banner">
+				<div v-if="aiStore.error" class="error-banner" :class="{ 'error-critical': !backendConnected }">
 					<span>{{ aiStore.error }}</span>
 					<button @click="aiStore.error = ''">×</button>
 				</div>
 
-				<div v-if="aiStore.loading" class="loading-overlay">
+				<div v-if="aiStore.loading && !aiStore.chainRunning" class="loading-overlay">
 					<div class="loading-spinner">
 						<div class="spinner-ring"></div>
 					</div>
 					<span class="loading-text">{{ loadingText }}</span>
 				</div>
 
+				<div v-if="aiStore.chainRunning" class="loading-overlay">
+					<div class="loading-spinner">
+						<div class="spinner-ring"></div>
+					</div>
+					<span class="loading-text">{{ aiStore.chainProgress }}</span>
+				</div>
+
 				<template v-if="!aiStore.sessionId">
-					<div class="init-section">
+					<div v-if="backendConnected === false" class="init-section">
+						<div class="offline-notice">
+							<span class="offline-icon">🔌</span>
+							<h3>AI 服务未连接</h3>
+							<p>请确认 Python 后端已启动：</p>
+							<code class="start-cmd">uvicorn api.app:app --host 0.0.0.0 --port 8000</code>
+							<button class="retry-btn" @click="recheckConnection">重新检测</button>
+						</div>
+					</div>
+					<div v-else class="init-section">
 						<h3>开始 AI 优化</h3>
 						<p>上传简历或新建简历，AI 将帮你分析并优化</p>
 						<div class="init-actions">
-							<button class="start-btn primary" @click="handleStartWithUpload">
+							<button class="start-btn primary" :disabled="backendConnected === false" @click="handleStartWithUpload">
 								📄 上传简历
 							</button>
-							<button class="start-btn secondary" @click="handleStart">
+							<button class="start-btn secondary" :disabled="backendConnected === false" @click="handleStart">
 								✨ 新建优化
 							</button>
 						</div>
@@ -62,9 +79,7 @@
 
 				<template v-else>
 					<ResumeParseReview v-if="aiStore.currentStep === 'parse'" @upload="handleUpload" @confirm="handleParseConfirm" />
-					<CareerChat v-else-if="aiStore.currentStep === 'career'" />
-					<JDInput v-else-if="aiStore.currentStep === 'jd'" />
-					<DiagnosisReport v-else-if="aiStore.currentStep === 'diagnosis'" />
+					<ProfileForm v-else-if="aiStore.currentStep === 'profile'" />
 					<ModuleOptimize v-else-if="aiStore.currentStep === 'optimize'" />
 					<OptimizeDone v-else-if="aiStore.currentStep === 'done'" />
 				</template>
@@ -100,17 +115,30 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useAIOptimizeStore, OPTIMIZE_STEPS } from '@/stores/aiOptimize'
+import { checkAIHealth } from '@/api/ai'
 import ResumeParseReview from './ResumeParseReview.vue'
-import CareerChat from './CareerChat.vue'
-import JDInput from './JDInput.vue'
-import DiagnosisReport from './DiagnosisReport.vue'
+import ProfileForm from './ProfileForm.vue'
 import ModuleOptimize from './ModuleOptimize.vue'
 import OptimizeDone from './OptimizeDone.vue'
 
 const aiStore = useAIOptimizeStore()
 const fileInputRef = ref(null)
+const backendConnected = ref(null)
+
+onMounted(() => {
+	checkAIHealth().then(res => {
+		backendConnected.value = res.ok
+	})
+})
+
+function recheckConnection() {
+	backendConnected.value = null
+	checkAIHealth().then(res => {
+		backendConnected.value = res.ok
+	})
+}
 
 const loadingText = computed(() => {
 	const agentMap = {
@@ -154,7 +182,7 @@ function handleUpload() {
 }
 
 function handleParseConfirm() {
-	aiStore.goToStep('career')
+	aiStore.goToStep('profile')
 }
 
 async function handleNext() {
@@ -163,16 +191,8 @@ async function handleNext() {
 		aiStore.error = '请先确认解析结果'
 		return
 	}
-	if (step === 'career' && !aiStore.careerProfile) {
-		aiStore.error = '请先完成职业方向分析'
-		return
-	}
-	if (step === 'jd' && !aiStore.jdStructured) {
+	if (step === 'profile' && !aiStore.jdStructured) {
 		aiStore.error = '请先输入目标岗位 JD'
-		return
-	}
-	if (step === 'diagnosis' && !aiStore.diagnosisReport) {
-		aiStore.error = '请先完成诊断分析'
 		return
 	}
 	aiStore.nextStep()
@@ -232,6 +252,22 @@ $error: #ef4444;
 
 .title-icon {
 	font-size: 20px;
+}
+
+.status-dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	margin-left: 4px;
+}
+.status-dot.online {
+	background: #10b981;
+	box-shadow: 0 0 4px rgba(16, 185, 129, 0.5);
+}
+.status-dot.offline {
+	background: #ef4444;
+	box-shadow: 0 0 4px rgba(239, 68, 68, 0.5);
 }
 
 .close-btn {
@@ -388,6 +424,59 @@ $error: #ef4444;
 		padding: 0 4px;
 	}
 }
+.error-banner.error-critical {
+	background: #fff3f3;
+	border-bottom-color: #ef4444;
+	font-weight: 500;
+}
+
+.offline-notice {
+	padding: 40px 20px;
+	text-align: center;
+
+	.offline-icon {
+		font-size: 40px;
+		display: block;
+		margin-bottom: 12px;
+	}
+	h3 {
+		font-size: 18px;
+		font-weight: 600;
+		color: #111827;
+		margin-bottom: 8px;
+	}
+	p {
+		font-size: 14px;
+		color: #6b7280;
+		margin-bottom: 16px;
+	}
+	.start-cmd {
+		display: block;
+		background: #1f2937;
+		color: #e5e7eb;
+		padding: 10px 16px;
+		border-radius: 6px;
+		font-size: 13px;
+		font-family: 'Consolas', monospace;
+		text-align: center;
+		margin-bottom: 20px;
+		user-select: all;
+	}
+	.retry-btn {
+		padding: 8px 20px;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		background: #fff;
+		color: #374151;
+		font-size: 14px;
+		cursor: pointer;
+		transition: all 0.2s;
+		&:hover {
+			border-color: $primary;
+			color: $primary;
+		}
+	}
+}
 
 .init-section {
 	padding: 40px 24px;
@@ -414,6 +503,11 @@ $error: #ef4444;
 }
 
 .start-btn {
+	&:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+		transform: none;
+	}
 	padding: 12px 32px;
 	border: none;
 	border-radius: 8px;

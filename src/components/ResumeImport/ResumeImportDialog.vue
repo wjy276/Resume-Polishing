@@ -153,17 +153,22 @@ async function handleImport() {
 
 	try {
 		let resumeData = null
+		let title = ''
 
 		if (activeTab.value === 'file') {
+			title = `导入简历 - ${selectedFile.value?.name || ''}`
 			resumeData = await importFromFile()
 		} else if (activeTab.value === 'text') {
+			title = '导入简历 - 文本粘贴'
 			resumeData = await importFromText()
 		} else if (activeTab.value === 'json') {
+			title = '导入简历 - JSON'
 			resumeData = await importFromJson()
 		}
 
 		if (resumeData) {
-			const result = await resumeStore.createResumeOnServer(resumeData)
+			// 使用 AI 解析的数据创建简历
+			const result = await resumeStore.createResumeFromParsedData(resumeData, title)
 			if (result.success) {
 				uni.showToast({ title: '导入成功', icon: 'success' })
 				emit('imported', result.id)
@@ -173,6 +178,7 @@ async function handleImport() {
 			}
 		}
 	} catch (e) {
+		console.error('导入失败:', e)
 		uni.showToast({ title: '导入失败', icon: 'none' })
 	} finally {
 		importing.value = false

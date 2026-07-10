@@ -37,13 +37,13 @@
 					placeholder="简历名称"
 					:key="activeResume?.id"
 				/>
+				<button class="save-btn" @click="handleSave" :disabled="saving">
+					<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M2 2h9l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10 2v4H5V2M5 14v-4h6v4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+					<span class="save-label">{{ saving ? '保存中...' : '保存' }}</span>
+				</button>
 				<button class="ai-optimize-btn" @click="openAIPanel">
 					<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
 					<span class="ai-label">AI 优化</span>
-				</button>
-				<button class="save-template-btn" @click="showSaveTemplate = true">
-					<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M2 2h9l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10 2v4H5V2M5 14v-4h6v4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
-					<span class="template-label">存为模板</span>
 				</button>
 				<button class="export-btn" @click="exportPdf">
 					<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M8 2v9M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -124,7 +124,15 @@
 			</div>
 		</div>
 
-		<AIOptimizePanel />
+		<AIOptimizeDialog
+			:visible="showAIDialog"
+			@close="showAIDialog = false"
+		/>
+		<ChatDialog
+			:visible="showChatDialog"
+			@close="showChatDialog = false"
+			@submit="handleChatSubmit"
+		/>
 
 		<SaveAsTemplateDialog
 			v-model:visible="showSaveTemplate"
@@ -139,13 +147,15 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { onLoad } from '@dcloudio/uni-app'
 import { useResumeStore } from '@/stores/resume'
+import { editorResumeToAgentInput } from '@/utils/resume/agentAdapter'
 import { useAIOptimizeStore } from '@/stores/aiOptimize'
 import { createNewResume } from '@/utils/resume/initialData'
 import { normalizeMenuSection } from '@/utils/resume/serializer'
 import SidePanel from '@/components/resume/SidePanel.vue'
 import EditPanel from '@/components/resume/EditPanel.vue'
 import ClassicTemplate from '@/components/resume/ClassicTemplate.vue'
-import AIOptimizePanel from '@/components/AIOptimize/AIOptimizePanel.vue'
+import AIOptimizeDialog from '@/components/AIOptimize/AIOptimizeDialog.vue'
+import ChatDialog from '@/components/AIOptimize/ChatDialog.vue'
 import SaveAsTemplateDialog from '@/components/TemplateGallery/SaveAsTemplateDialog.vue'
 
 const A4_WIDTH_PX = 794   // 210mm at 96dpi
@@ -161,6 +171,9 @@ const previewPanelRef = ref(null)
 const previewScrollRef = ref(null)
 const manualScale = ref(null)  // null = auto-fit
 const showSaveTemplate = ref(false)
+const showAIDialog = ref(false)
+const showChatDialog = ref(false)
+let pendingModuleIds = []
 
 const resumeTitle = computed(() => activeResume.value?.title || '未命名简历')
 const activeSection = computed(() => activeResume.value?.activeSection || 'basic')
@@ -295,21 +308,75 @@ function goBack() {
 	uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/Resume/Resume' }) })
 }
 
-async function openAIPanel() {
-	if (!aiStore.sessionId && activeResume.value) {
-		uni.showLoading({ title: 'AI 准备中...' })
-		const res = await aiStore.initSession(true, '')
-		uni.hideLoading()
-		
-		if (res.success) {
-			const editorData = JSON.parse(JSON.stringify(activeResume.value))
-			aiStore.parsedResumeRaw = editorData
-			aiStore.parsedResumeForEditor = editorData
-			aiStore.parseConfirmed = true
-			aiStore.goToStep('career')
+const saving = ref(false)
+
+async function handleSave() {
+	if (!activeResume.value) return
+	
+	saving.value = true
+	try {
+		const result = await store.saveActiveToServer()
+		if (result?.success) {
+			uni.showToast({ title: '保存成功', icon: 'success' })
+		} else {
+			uni.showToast({ title: result?.message || '保存失败', icon: 'none' })
 		}
+	} catch (e) {
+		console.error('保存失败:', e)
+		uni.showToast({ title: '保存失败', icon: 'none' })
+	} finally {
+		saving.value = false
 	}
-	aiStore.openPanel()
+}
+
+async function openAIPanel() {
+	const resume = activeResume.value
+	if (!resume) return
+
+	const agentInput = editorResumeToAgentInput(resume)
+	const textParts = []
+	if (agentInput.name) textParts.push(`姓名：${agentInput.name}`)
+	if (agentInput.title) textParts.push(`求职意向：${agentInput.title}`)
+	if (agentInput.education?.length) {
+		textParts.push('\n【教育背景】')
+		agentInput.education.forEach(e => textParts.push(`${e.school} ${e.major} ${e.degree}`))
+	}
+	if (agentInput.experience?.length) {
+		textParts.push('\n【工作经历】')
+		agentInput.experience.forEach(e => textParts.push(`${e.company} ${e.position} ${e.date}\n${e.details}`))
+	}
+	if (agentInput.projects?.length) {
+		textParts.push('\n【项目经历】')
+		agentInput.projects.forEach(p => textParts.push(`${p.name}\n${p.description}`))
+	}
+	if (agentInput.skills) textParts.push(`\n【技能】\n${agentInput.skills}`)
+	if (agentInput.selfEvaluation) textParts.push(`\n【自我评价】\n${agentInput.selfEvaluation}`)
+	const resumeText = textParts.join('\n')
+
+	const sections = resume?.menuSections || []
+	pendingModuleIds = sections.filter(s => s.enabled && s.id !== 'basic').map(s => s.id)
+
+	const parseRes = await aiStore.parseExistingResume(resumeText)
+	if (!parseRes.success) {
+		return
+	}
+
+	showChatDialog.value = true
+}
+
+async function handleChatSubmit(profileData) {
+	showChatDialog.value = false
+
+	const res = await aiStore.runFullOptimization({
+		prompt: Object.entries(profileData).filter(([,v]) => v).map(([k,v]) => `${k}：${v}`).join('\n'),
+		jdText: '',
+		moduleIds: pendingModuleIds,
+		skipParse: true,
+	})
+
+	if (res.success) {
+		showAIDialog.value = true
+	}
 }
 
 function handleTemplateSaved() {
@@ -575,6 +642,31 @@ ${el.innerHTML}
 
 	@media (max-width: 640px) {
 		.template-label { display: none; }
+		padding: 6px 10px;
+	}
+}
+
+.save-btn {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	padding: 6px 14px;
+	background: #10b981;
+	color: #fff;
+	border: none;
+	border-radius: 7px;
+	font-size: 12.5px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.15s;
+	white-space: nowrap;
+
+	&:hover { background: #059669; }
+	&:active { background: #047857; }
+	&:disabled { opacity: 0.5; cursor: not-allowed; }
+
+	@media (max-width: 640px) {
+		.save-label { display: none; }
 		padding: 6px 10px;
 	}
 }

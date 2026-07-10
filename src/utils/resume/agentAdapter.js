@@ -3,98 +3,114 @@
  * Agent 1 (resume_parser) 输出 → 编辑器 resume 结构
  * 编辑器 resume 结构 → Agent 输入（用于后续 Agent 读取当前简历）
  */
-import { generateId } from './initialData'
+import { generateId, DEFAULT_GLOBAL_SETTINGS, DEFAULT_PHOTO_CONFIG, DEFAULT_FIELD_ORDER } from './initialData'
 
 /**
  * Agent 1 解析结果 → 编辑器 resume 结构
+ * 保留所有原始数据，不丢失任何字段
  * @param {Object} parsed - Agent 1 返回的 resume_structured
  * @returns {Object} 编辑器可用的 resume 数据
  */
 export function parsedToEditorResume(parsed) {
 	if (!parsed || typeof parsed !== 'object') return null
 
+	console.log('[Adapter] 原始解析数据:', parsed)
+
+	// 处理基本信息 - 保留所有字段
+	const basic = {
+		name: parsed.name || parsed.basic?.name || '',
+		title: parsed.title || parsed.basic?.title || parsed.position || parsed.jobIntention || '',
+		email: parsed.email || parsed.basic?.email || '',
+		phone: parsed.phone || parsed.basic?.phone || '',
+		location: parsed.location || parsed.basic?.location || '',
+		birthDate: parsed.birthDate || parsed.basic?.birthDate || '',
+		employementStatus: parsed.employementStatus || parsed.employmentStatus || parsed.basic?.employementStatus || parsed.basic?.employmentStatus || '',
+		photo: parsed.photo || parsed.basic?.photo || '',
+		photoConfig: { ...DEFAULT_PHOTO_CONFIG, ...(parsed.basic?.photoConfig || parsed.photoConfig || {}) },
+		fieldOrder: parsed.basic?.fieldOrder?.length ? parsed.basic.fieldOrder : (parsed.fieldOrder?.length ? parsed.fieldOrder : [...DEFAULT_FIELD_ORDER]),
+		icons: {
+			email: '📧',
+			phone: '📱',
+			location: '📍',
+			birthDate: '📅',
+			employementStatus: '💼',
+			...(parsed.basic?.icons || parsed.icons || {}),
+		},
+		customFields: parsed.basic?.customFields || parsed.customFields || [],
+		layout: parsed.basic?.layout || parsed.layout || 'left',
+	}
+
+	// 处理工作经历 - 保留所有字段
+	const experience = parseExperienceList(parsed.experience || parsed.work_experience || parsed.workExperience || [])
+	
+	// 处理项目经历 - 保留所有字段
+	const projects = parseProjectList(parsed.projects || parsed.project_experience || parsed.projectExperience || [])
+	
+	// 处理教育背景 - 保留所有字段
+	const education = parseEducationList(parsed.education || parsed.education_experience || parsed.educationExperience || [])
+	
+	// 处理技能 - 保留所有字段
+	const skillContent = parseSkillContent(parsed.skills || parsed.skillContent || parsed.skill_content || '')
+	
+	// 处理自我评价 - 保留所有字段
+	const selfEvaluationContent = parseSelfEvaluation(parsed.self_evaluation || parsed.selfEvaluationContent || parsed.selfEvaluation || parsed.summary || '')
+
+	// 处理证书 - 保留所有字段
+	const certificates = parseCertificates(parsed.certificates || parsed.certificate || [])
+
+	// 构建 menuSections
+	const menuSections = buildMenuSections({
+		experience: experience.length > 0,
+		projects: projects.length > 0,
+		education: education.length > 0,
+		skills: !!skillContent,
+		selfEvaluation: !!selfEvaluationContent,
+		certificates: certificates.length > 0,
+	})
+
 	const result = {
 		id: generateId(),
 		title: parsed.title || '导入简历',
 		createdAt: new Date().toISOString(),
 		updatedAt: new Date().toISOString(),
-		templateId: 'classic',
+		templateId: parsed.templateId || 'classic',
 		activeSection: 'basic',
-		basic: {
-			name: parsed.name || parsed.basic?.name || '',
-			title: parsed.title || parsed.basic?.title || parsed.position || '',
-			email: parsed.email || parsed.basic?.email || '',
-			phone: parsed.phone || parsed.basic?.phone || '',
-			location: parsed.location || parsed.basic?.location || '',
-			birthDate: parsed.birthDate || parsed.basic?.birthDate || '',
-			employementStatus: parsed.employementStatus || parsed.basic?.employementStatus || '',
-			photo: '',
-			photoConfig: {
-				width: 90,
-				height: 110,
-				aspectRatio: '3:4',
-				borderRadius: 'none',
-				customBorderRadius: 0,
-				visible: true,
-			},
-			fieldOrder: [
-				{ id: 'f1', key: 'name', label: '姓名', visible: true },
-				{ id: 'f2', key: 'title', label: '职位', visible: true },
-				{ id: 'f3', key: 'email', label: '邮箱', visible: true },
-				{ id: 'f4', key: 'phone', label: '电话', visible: true },
-				{ id: 'f5', key: 'location', label: '所在地', visible: true },
-				{ id: 'f6', key: 'birthDate', label: '出生年月', visible: true },
-				{ id: 'f7', key: 'employementStatus', label: '求职状态', visible: true },
-			],
-			icons: {
-				email: '📧',
-				phone: '📱',
-				location: '📍',
-				birthDate: '📅',
-				employementStatus: '💼',
-			},
-			customFields: [],
-		},
-		experience: parseExperienceList(parsed.experience || parsed.work_experience || []),
-		projects: parseProjectList(parsed.projects || parsed.project_experience || []),
-		education: parseEducationList(parsed.education || parsed.education_experience || []),
-		skillContent: parseSkillContent(parsed.skills || parsed.skillContent || parsed.skill_content || ''),
-		selfEvaluationContent: parseSelfEvaluation(parsed.self_evaluation || parsed.selfEvaluationContent || parsed.summary || ''),
-		menuSections: [
-			{ id: 'basic', title: '基本信息', icon: '👤', enabled: true, order: 0 },
-			{ id: 'experience', title: '工作经历', icon: '💼', enabled: true, order: 1 },
-			{ id: 'projects', title: '项目经历', icon: '🚀', enabled: true, order: 2 },
-			{ id: 'education', title: '教育背景', icon: '🎓', enabled: true, order: 3 },
-			{ id: 'skills', title: '专业技能', icon: '⚡', enabled: true, order: 4 },
-			{ id: 'selfEvaluation', title: '自我评价', icon: '💬', enabled: false, order: 5 },
-		],
-		globalSettings: {
-			themeColor: '#000000',
-			fontFamily: 'default',
-			baseFontSize: 14,
-			pagePadding: 32,
-			paragraphSpacing: 12,
-			lineHeight: 1.5,
-			sectionSpacing: 16,
-			headerSize: 18,
-			subheaderSize: 15,
-			useIconMode: true,
-			centerSubtitle: true,
-		},
+		basic,
+		experience,
+		projects,
+		education,
+		skillContent,
+		selfEvaluationContent,
+		certificates,
+		customData: parsed.customData || {},
+		menuSections,
+		globalSettings: { ...DEFAULT_GLOBAL_SETTINGS, ...(parsed.globalSettings || {}) },
 	}
+
+	console.log('[Adapter] 转换后数据:', result)
 
 	return result
 }
 
 function parseExperienceList(list) {
 	if (!Array.isArray(list)) return []
-	return list.map((item) => ({
-		id: generateId(),
-		company: item.company || item.company_name || '',
-		position: item.position || item.job_title || '',
-		date: buildDateStr(item.start_date || item.startDate, item.end_date || item.endDate, item.current),
-		details: wrapHtml(item.details || item.description || item.responsibilities || ''),
-	}))
+	return list.map((item) => {
+		let details = item.details || item.description || ''
+		if (!details) {
+			const parts = []
+			if (Array.isArray(item.responsibilities)) parts.push(item.responsibilities.join('\n'))
+			else if (item.responsibilities) parts.push(item.responsibilities)
+			if (Array.isArray(item.technologies) && item.technologies.length) parts.push('技术栈：' + item.technologies.join(', '))
+			details = parts.join('\n')
+		}
+		return {
+			id: generateId(),
+			company: item.company || item.company_name || '',
+			position: item.position || item.job_title || item.title || '',
+			date: buildDateStr(item.start_date || item.startDate, item.end_date || item.endDate, item.current),
+			details: wrapHtml(details),
+		}
+	})
 }
 
 function parseProjectList(list) {
@@ -105,7 +121,7 @@ function parseProjectList(list) {
 		role: item.role || '',
 		date: buildDateStr(item.start_date || item.startDate, item.end_date || item.endDate, item.current),
 		link: item.link || item.url || '',
-		description: wrapHtml(item.description || item.details || ''),
+		description: wrapHtml(item.description || item.details || (Array.isArray(item.highlights) ? item.highlights.join('\n') : item.highlights || '') || (Array.isArray(item.technologies) && item.technologies.length ? '技术栈：' + item.technologies.join(', ') : '')),
 	}))
 }
 
@@ -146,6 +162,7 @@ function buildDateStr(start, end, current) {
 
 function wrapHtml(text) {
 	if (!text) return ''
+	if (Array.isArray(text)) text = text.join('\n')
 	if (text.startsWith('<')) return text
 	const lines = text.split('\n').filter(Boolean)
 	if (lines.length <= 1) return `<p>${text}</p>`

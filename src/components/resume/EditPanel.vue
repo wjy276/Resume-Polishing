@@ -30,14 +30,16 @@
 import { computed, defineAsyncComponent } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useResumeStore } from '@/stores/resume'
-import { mergeMenuSections } from '@/utils/resume/serializer'
+import { normalizeMenuSection } from '@/utils/resume/serializer'
 
 const store = useResumeStore()
 const { activeResume } = storeToRefs(store)
 const activeSection = computed(() => activeResume.value?.activeSection || 'basic')
-const currentSection = computed(() =>
-	mergeMenuSections(activeResume.value?.menuSections || []).find(s => s.id === activeSection.value)
-)
+const currentSection = computed(() => {
+	const sections = activeResume.value?.menuSections || []
+	const normalized = sections.map(normalizeMenuSection).filter(Boolean)
+	return normalized.find(s => s.id === activeSection.value)
+})
 
 const panelMap = {
 	basic:          defineAsyncComponent(() => import('./sections/BasicPanel.vue')),

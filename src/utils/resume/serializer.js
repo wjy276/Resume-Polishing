@@ -36,7 +36,6 @@ function parseDateRange(dateStr) {
 	const start = (parts[0] || '').trim()
 	const tail = (parts[1] || '').trim()
 	const current = tail === CURRENT_TOKEN || tail === '现在' || tail === 'present'
-	const activeSection = SECTION_ID_ALIASES[data.activeSection] || data.activeSection || defaults.activeSection || 'basic'
 
 	return {
 		startDate: start,
@@ -584,10 +583,12 @@ export function fromApiResponse(data, defaults = {}) {
 		description: it.description || '',
 	}))
 
-	const fieldOrder = safeJsonParse(data.fieldOrder, null)
-	const icons = safeJsonParse(data.icons, {})
-	const photoConfig = safeJsonParse(data.photoConfig, null)
-	const customFieldsRaw = safeJsonParse(data.customFields, [])
+	// 处理 basic 信息 - 支持嵌套结构和展平结构
+	const basicData = data.basic || data
+	const fieldOrder = safeJsonParse(basicData.fieldOrder || data.fieldOrder, null)
+	const icons = safeJsonParse(basicData.icons || data.icons, {})
+	const photoConfig = safeJsonParse(basicData.photoConfig || data.photoConfig, null)
+	const customFieldsRaw = safeJsonParse(basicData.customFields || data.customFields, [])
 	const activeSection = data.activeSection || 'basic'
 
 	return {
@@ -608,7 +609,7 @@ export function fromApiResponse(data, defaults = {}) {
 				: [],
 		activeSection: menuSections.some((s) => s.id === activeSection) ? activeSection : 'basic',
 		basic: {
-			layout: data.layout || 'left',
+			layout: basicData.layout || 'left',
 			photoConfig: photoConfig || { ...DEFAULT_PHOTO_CONFIG },
 			fieldOrder: fieldOrder || [...DEFAULT_FIELD_ORDER],
 			icons,
@@ -619,22 +620,22 @@ export function fromApiResponse(data, defaults = {}) {
 				visible: f.visible !== false,
 				icon: f.icon || '🔗',
 			})),
-			name: data.name || '',
-			title: data.positionTitle || '',
-			employementStatus: data.employmentStatus || data.employementStatus || '',
-			email: data.email || '',
-			phone: data.phone || '',
-			location: data.location || '',
-			birthDate: data.birthDate || '',
-			photo: data.photo || '',
-		},
-		experience,
-		projects,
-		education,
-		skillContent: data.skillContent || '',
-		selfEvaluationContent: data.selfEvaluation || data.selfEvaluationContent || '',
-		customData,
-	}
+			name: basicData.name || '',
+			title: basicData.positionTitle || basicData.title || '',
+			employementStatus: basicData.employmentStatus || basicData.employementStatus || '',
+			email: basicData.email || '',
+			phone: basicData.phone || '',
+			location: basicData.location || '',
+		birthDate: basicData.birthDate || '',
+		photo: basicData.photo || '',
+	},
+	experience,
+	projects,
+	education,
+	skillContent: data.skillContent || '',
+	selfEvaluationContent: data.selfEvaluationContent || '',
+	customData,
+}
 }
 
 // ─────────────────────────────────────────────────────────────

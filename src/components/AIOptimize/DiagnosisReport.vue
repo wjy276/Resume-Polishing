@@ -171,7 +171,10 @@ function getPriorityText(priority) {
 }
 
 async function handleStartDiagnosis() {
-	await aiStore.runDiagnosisAgent()
+	const sections = aiStore.currentModuleIds && aiStore.currentModuleIds.length
+		? aiStore.currentModuleIds
+		: ['summary', 'experience', 'projects', 'skills', 'education']
+	await aiStore.runPostJDChain(sections)
 }
 
 function handleGoOptimize() {

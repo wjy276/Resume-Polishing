@@ -302,19 +302,25 @@ async function handleUpload() {
 		const result = await aiStore.uploadAndParse(selectedFile.value)
 		
 		if (result.success && result.data) {
-			const resumeResult = await store.createResumeOnServer({
-				title: `导入简历 - ${selectedFile.value.name}`,
-			})
+			// 使用 AI 解析的数据创建简历
+			const resumeResult = await store.createResumeFromParsedData(
+				result.data,
+				`导入简历 - ${selectedFile.value.name}`
+			)
 			
 			if (resumeResult.success && resumeResult.id) {
 				uni.showToast({ title: '解析成功', icon: 'success' })
 				showUpload.value = false
-				uni.navigateTo({ url: `/pages/Resume/ResumeEditor?id=${resumeResult.id}&aiOptimize=1` })
+				await refreshList()
+				uni.navigateTo({ url: `/pages/Resume/ResumeEditor?id=${resumeResult.id}` })
+			} else {
+				uni.showToast({ title: resumeResult.message || '创建失败', icon: 'none' })
 			}
 		} else {
 			uni.showToast({ title: result.message || '解析失败', icon: 'none' })
 		}
 	} catch (e) {
+		console.error('上传失败:', e)
 		uni.showToast({ title: '上传失败', icon: 'none' })
 	} finally {
 		uploading.value = false

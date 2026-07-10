@@ -10,7 +10,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, reactive, computed, watch } from 'vue'
-import { createBlankResume, createNewResume, generateId } from '@/utils/resume/initialData'
+import { createBlankResume, createNewResume, generateId, DEFAULT_GLOBAL_SETTINGS, DEFAULT_PHOTO_CONFIG, DEFAULT_FIELD_ORDER } from '@/utils/resume/initialData'
 import { toApiPayload, fromApiResponse, mergeMenuSections, mergeResumeWithDraft } from '@/utils/resume/serializer'
 import {
 	fetchResumeList,
@@ -24,13 +24,42 @@ const STORAGE_KEY = 'magic_resume_store'
 const SAVE_DEBOUNCE_MS = 800
 const API_SAVE_DEBOUNCE_MS = 1200
 
+// AI 返回的菜单项 → 前端菜单格式
+const AI_SECTION_MAP = {
+	basic: { title: '基本信息', icon: '👤' },
+	education: { title: '教育背景', icon: '🎓' },
+	experience: { title: '工作经历', icon: '💼' },
+	projects: { title: '项目经历', icon: '🚀' },
+	certificates: { title: '荣誉证书', icon: '🏆' },
+	skills: { title: '专业技能', icon: '⚡' },
+	selfEvaluation: { title: '自我评价', icon: '💬' },
+}
+
+function normalizeMenuSectionsFromAI(menuSections) {
+	if (!Array.isArray(menuSections) || menuSections.length === 0) {
+		return [{ id: 'basic', title: '基本信息', icon: '👤', enabled: true, order: 0 }]
+	}
+	return menuSections.map((id, index) => {
+		const config = AI_SECTION_MAP[id] || { title: id, icon: '📂' }
+		return {
+			id,
+			title: config.title,
+			icon: config.icon,
+			enabled: true,
+			order: index,
+		}
+	})
+}
+
 // AI 优化结果回写时用的模块字段映射
 export const SECTION_FIELD_MAP = {
+	summary:        { type: 'top', field: 'selfEvaluationContent' },
 	skills:         { type: 'top', field: 'skillContent' },
 	selfEvaluation: { type: 'top', field: 'selfEvaluationContent' },
 	experience:     { type: 'list', field: 'experience', html: 'details' },
 	projects:       { type: 'list', field: 'projects', html: 'description' },
 	education:      { type: 'list', field: 'education', html: 'description' },
+	certifications: { type: 'custom', field: 'certifications' },
 }
 
 export const useResumeStore = defineStore('resume', () => {
@@ -195,6 +224,232 @@ export const useResumeStore = defineStore('resume', () => {
 			return { success: true, id: created.id }
 		} catch (e) {
 			console.error('createResumeOnServer:', e)
+			syncError.value = '创建简历失败'
+			return { success: false, message: syncError.value }
+		} finally {
+			listLoading.value = false
+		}
+	}
+
+	/** 将纯文本转为简单 HTML（适配 RichTextEditor 格式） */
+	function toHtml(text) {
+		if (!text) return ''
+		if (text.startsWith('<')) return text
+		const lines = text.split('\n').filter(Boolean)
+		if (lines.length <= 1) return `<p>${text}</p>`
+		return '<ul>' + lines.map(l => `<li>${l}</li>`).join('') + '</ul>'
+	}
+
+	/** 从 AI 解析数据创建简历（数据已是编辑器格式） */
+	async function createResumeFromParsedData(editorData, title = '') {
+		if (!editorData) return { success: false, message: '解析数据为空' }
+
+		console.log('========== [Store 接收数据] ==========')
+		console.log('1. 基本信息:', editorData.basic)
+		console.log('2. 教育背景:', editorData.education)
+		console.log('3. 工作经历:', editorData.experience)
+		console.log('4. 项目经历:', editorData.projects)
+		console.log('5. 专业技能:', editorData.skillContent)
+		console.log('6. 自我评价:', editorData.selfEvaluationContent)
+		console.log('=====================================')
+
+		// 智能转换：如果工作经历为空但项目经历不为空，尝试将项目经历转换为工作经历
+		let projects = editorData.projects || []
+		let experience = editorData.experience || []
+		
+		console.log('[检查项目经历字段]')
+		projects.forEach((p, i) => {
+			console.log(`项目${i+1}:`, {
+				name: p.name,
+				role: p.role,
+				company: p.company,
+				position: p.position,
+				date: p.date,
+				hasDescription: !!p.description,
+				descriptionLength: p.description?.length || 0,
+			})
+		})
+		
+		if (experience.length === 0 && projects.length > 0) {
+			console.log('[智能转换] 工作经历为空，尝试将项目经历转换为工作经历')
+			// 更宽松的条件：只要有描述内容的项目经历都可能是工作经历
+			const workLikeProjects = projects.filter(p => 
+				p.description || p.details || p.role || p.company || p.position
+			)
+			console.log('[智能转换] 匹配到', workLikeProjects.length, '条可能的工作经历')
+			
+			if (workLikeProjects.length > 0) {
+				experience = workLikeProjects.map(p => ({
+					company: p.company || p.name || '未知公司',
+					position: p.position || p.role || '未知职位',
+					date: p.date || '',
+					details: p.details || p.description || '',
+				}))
+				// 从项目经历中移除已转换的
+				projects = projects.filter(p => 
+					!p.description && !p.details && !p.role && !p.company && !p.position
+				)
+				console.log('[智能转换] 转换完成')
+				console.log('[智能转换] 工作经历:', experience)
+				console.log('[智能转换] 剩余项目经历:', projects)
+			}
+		}
+
+		// 后端返回的已是编辑器格式，直接使用
+		const draft = {
+			id: generateId(),
+			title: title || editorData.title || '导入简历',
+			templateId: editorData.templateId || 'classic',
+			activeSection: editorData.activeSection || 'basic',
+			globalSettings: { ...DEFAULT_GLOBAL_SETTINGS, ...(editorData.globalSettings || {}) },
+			menuSections: normalizeMenuSectionsFromAI([
+				...new Set([
+					...(editorData.menuSections || []),
+					...(editorData.selfEvaluationContent ? ['selfEvaluation'] : []),
+				]),
+			]),
+			basic: {
+				name: editorData.basic?.name || '',
+				title: editorData.basic?.title || editorData.basic?.jobIntention || '',
+				email: editorData.basic?.email || '',
+				phone: editorData.basic?.phone || '',
+				location: editorData.basic?.location || '',
+				birthDate: editorData.basic?.birthDate || '',
+				employementStatus: editorData.basic?.employementStatus || editorData.basic?.employmentStatus || '',
+				photo: editorData.basic?.photo || '',
+				photoConfig: { ...DEFAULT_PHOTO_CONFIG, ...(editorData.basic?.photoConfig || {}) },
+				fieldOrder: editorData.basic?.fieldOrder?.length ? editorData.basic.fieldOrder : [...DEFAULT_FIELD_ORDER],
+				icons: {
+					email: '📧',
+					phone: '',
+					location: '📍',
+					birthDate: '📅',
+					employementStatus: '💼',
+					...(editorData.basic?.icons || {}),
+				},
+				customFields: editorData.basic?.customFields || [],
+				layout: editorData.basic?.layout || 'left',
+			},
+			experience: experience.map(exp => {
+				let details = exp.details || exp.description || ''
+				if (!details || details === '<p></p>') {
+					const parts = []
+					if (Array.isArray(exp.responsibilities)) parts.push(exp.responsibilities.join('\n'))
+					else if (exp.responsibilities) parts.push(exp.responsibilities)
+					if (Array.isArray(exp.technologies) && exp.technologies.length) parts.push('技术栈：' + exp.technologies.join(', '))
+					details = toHtml(parts.join('\n'))
+				} else {
+					details = toHtml(details)
+				}
+				return {
+					id: generateId(),
+					company: exp.company || '',
+					position: exp.position || exp.title || '',
+					date: exp.date || '',
+					details,
+					visible: exp.visible !== false,
+				}
+			}),
+			projects: projects.map(proj => ({
+				id: generateId(),
+				name: proj.name || '',
+				role: proj.role || '',
+				date: proj.date || '',
+				description: toHtml(proj.description || (Array.isArray(proj.highlights) ? proj.highlights.join('\n') : proj.highlights || '') || (Array.isArray(proj.technologies) && proj.technologies.length ? '技术栈：' + proj.technologies.join(', ') : '')),
+				link: proj.link || '',
+				visible: proj.visible !== false,
+			})),
+			education: (editorData.education || []).map(edu => ({
+				id: generateId(),
+				school: edu.school || '',
+				major: edu.major || '',
+				degree: edu.degree || '',
+				startDate: edu.startDate || '',
+				endDate: edu.endDate || '',
+				isCurrent: edu.isCurrent || false,
+				description: toHtml(edu.description || ''),
+				visible: edu.visible !== false,
+			})),
+			skillContent: toHtml(editorData.skillContent || ''),
+			selfEvaluationContent: toHtml(editorData.selfEvaluationContent || ''),
+			customData: {
+				...(editorData.customData || {}),
+				certificates: (editorData.certificates || []).map(cert => ({
+					id: generateId(),
+					title: cert.name || '',
+					date: cert.issueDate || '',
+					issuer: cert.issuer || '',
+					description: '',
+				})),
+			},
+		}
+
+		console.log('========== [Store 转换后] ==========')
+		console.log('1. 基本信息:', draft.basic)
+		console.log('2. 教育背景数量:', draft.education.length)
+		console.log('3. 工作经历数量:', draft.experience.length)
+		console.log('4. 项目经历数量:', draft.projects.length)
+		console.log('5. 专业技能长度:', draft.skillContent.length)
+		console.log('6. 自我评价长度:', draft.selfEvaluationContent.length)
+		console.log('===================================')
+
+		if (!_hasToken()) {
+			resumes[draft.id] = draft
+			activeResumeId.value = draft.id
+			_performSave()
+			uni.showToast({ title: '未登录，已仅存本地', icon: 'none' })
+			return { success: true, id: draft.id }
+		}
+
+		listLoading.value = true
+		syncError.value = ''
+		try {
+			const payload = toApiPayload(draft)
+			console.log('========== [发送给 Java 后端] ==========')
+			console.log('Payload 基本信息:', payload.basic)
+			console.log('Payload 教育背景:', payload.education)
+			console.log('Payload 工作经历:', payload.experience)
+			console.log('Payload 项目经历:', payload.projects)
+			console.log('Payload 专业技能:', payload.skillContent)
+			console.log('Payload 自我评价:', payload.selfEvaluationContent)
+			console.log('=======================================')
+			
+			const res = await createResumeApi(payload)
+			console.log('[Java 后端响应]:', res)
+			
+			if (!res.ok) {
+				syncError.value = res.message || '创建失败'
+				return { success: false, message: syncError.value }
+			}
+
+			let created = fromApiResponse(res.data, draft)
+			console.log('[fromApiResponse 转换后]:', created)
+
+			if (!created && res.data?.resumeId) {
+				const detailRes = await fetchResumeDetail(res.data.resumeId)
+				if (detailRes.ok) {
+					created = fromApiResponse(detailRes.data, draft)
+				}
+			}
+
+			if (!created) {
+				// 使用本地数据
+				_upsertResume(draft)
+				activeResumeId.value = draft.id
+				_performSave()
+				hydrated = true
+				return { success: true, id: draft.id }
+			}
+
+			const merged = mergeResumeWithDraft(draft, created)
+			console.log('[合并后最终数据]:', merged)
+			_upsertResume(merged)
+			activeResumeId.value = created.id
+			_performSave()
+			hydrated = true
+			return { success: true, id: created.id }
+		} catch (e) {
+			console.error('createResumeFromParsedData:', e)
 			syncError.value = '创建简历失败'
 			return { success: false, message: syncError.value }
 		} finally {
@@ -459,11 +714,13 @@ export const useResumeStore = defineStore('resume', () => {
 	function applyOptimizedModule(moduleId, html) {
 		if (!moduleId || !html || !activeResume.value) return
 		const cfg = SECTION_FIELD_MAP[moduleId]
-		if (cfg?.type === 'top') {
+		if (!cfg) return
+
+		if (cfg.type === 'top') {
 			activeResume.value[cfg.field] = html
 			return
 		}
-		if (cfg?.type === 'list') {
+		if (cfg.type === 'list') {
 			const list = activeResume.value[cfg.field] || []
 			if (list.length) {
 				list[0][cfg.html] = html
@@ -473,6 +730,15 @@ export const useResumeStore = defineStore('resume', () => {
 				addProject({ name: '', role: '', date: '', description: html })
 			} else if (cfg.field === 'education') {
 				addEducation({ school: '', major: '', degree: '', startDate: '', endDate: '', description: html })
+			}
+			return
+		}
+		if (cfg.type === 'custom') {
+			const items = activeResume.value.customData?.[cfg.field] || []
+			if (items.length) {
+				updateCustomItem(cfg.field, items[0].id, { description: html })
+			} else {
+				addCustomItem(cfg.field, { title: '', description: html })
 			}
 			return
 		}
@@ -601,6 +867,7 @@ export const useResumeStore = defineStore('resume', () => {
 		// resume lifecycle
 		createResume,
 		createResumeOnServer,
+		createResumeFromParsedData,
 		fetchAllFromServer,
 		loadResumeFromServer,
 		addResume,

@@ -120,7 +120,6 @@
 import { watch, onBeforeUnmount, ref, computed } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import { TextStyle } from '@tiptap/extension-text-style'
 
@@ -143,7 +142,6 @@ const editor = useEditor({
 	content: props.modelValue || '',
 	extensions: [
 		StarterKit,
-		Underline,
 		TextStyle,
 		TextAlign.configure({ types: ['heading', 'paragraph'] }),
 	],

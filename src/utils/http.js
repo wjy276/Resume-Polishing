@@ -3,7 +3,8 @@
  * 与登录等模块共用同一后端：http://81.71.75.85:6008/api
  */
 
-export const API_BASE_URL = 'http://81.71.75.85:6008/api'
+// 开发环境使用代理，生产环境使用完整 URL
+export const API_BASE_URL = import.meta.env.DEV ? '/api' : 'http://81.71.75.85:6008/api'
 
 let _tokenExpiredTimer = null
 
