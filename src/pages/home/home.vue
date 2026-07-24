@@ -1,21 +1,18 @@
-<!-- 首页模块 -->
-
-
 <template>
-	<view class="home-container">
+	<view class="page-layout">
 		<!-- 侧边栏 -->
 		<Sidebar />
-		
+
 		<!-- 主内容区 -->
-		<view class="main-content">
+		<view class="page-main home-main">
 			<!-- 顶部搜索栏 -->
 			<view class="top-bar">
 				<view class="search-wrapper">
 					<text class="search-icon">🔍</text>
-					<input 
-						v-model="searchKeyword" 
-						class="search-input" 
-						placeholder="搜索岗位、公司或关键词..." 
+					<input
+						v-model="searchKeyword"
+						class="search-input"
+						placeholder="搜索岗位、公司或关键词..."
 						placeholder-class="search-placeholder"
 					/>
 				</view>
@@ -36,8 +33,8 @@
 			<!-- 欢迎横幅 -->
 			<view class="welcome-banner">
 				<view class="banner-content">
-					<text class="greeting">早上好，张同学！</text>
-					<text class="description">今天有 156 个新岗位等待您的探索，立即开始您的求职之旅吧！</text>
+					<text class="greeting">{{ greeting }}，{{ userName }}！</text>
+					<text class="description">今天有 {{ todayJobs }} 个新岗位等待您的探索，立即开始您的求职之旅吧！</text>
 					<button class="start-btn" @click="startExplore">
 						开始探索
 						<text class="btn-arrow">→</text>
@@ -47,7 +44,7 @@
 
 			<!-- 功能卡片区域 -->
 			<view class="cards-container">
-				<view class="card-item resume-card">
+				<view class="card-item resume-card" @click="goToResume">
 					<view class="card-header">
 						<view class="card-icon resume-icon">
 							<text class="icon-text">📄</text>
@@ -57,14 +54,14 @@
 					<view class="card-body">
 						<text class="card-title">简历优化</text>
 						<text class="card-desc">AI 智能分析简历，根据目标岗位自动优化，提供专业修改建议</text>
-						<button class="action-btn resume-btn" @click="goToResume">
+						<button class="action-btn resume-btn">
 							开始优化
 							<text class="btn-arrow">→</text>
 						</button>
 					</view>
 				</view>
 
-				<view class="card-item job-card">
+				<view class="card-item job-card" @click="goToJob">
 					<view class="card-header">
 						<view class="card-icon job-icon">
 							<text class="icon-text">💼</text>
@@ -74,14 +71,14 @@
 					<view class="card-body">
 						<text class="card-title">职位推荐</text>
 						<text class="card-desc">基于技能画像智能匹配，精准推荐最适合您的岗位</text>
-						<button class="action-btn job-btn" @click="goToJob">
+						<button class="action-btn job-btn">
 							查看推荐
 							<text class="btn-arrow">→</text>
 						</button>
 					</view>
 				</view>
 
-				<view class="card-item interview-card">
+				<view class="card-item interview-card" @click="goToInterview">
 					<view class="card-header">
 						<view class="card-icon interview-icon">
 							<text class="icon-text">💬</text>
@@ -91,7 +88,7 @@
 					<view class="card-body">
 						<text class="card-title">模拟面试</text>
 						<text class="card-desc">AI 模拟真实面试场景，提升面试技巧，增强自信心</text>
-						<button class="action-btn interview-btn" @click="goToInterview">
+						<button class="action-btn interview-btn">
 							开始面试
 							<text class="btn-arrow">→</text>
 						</button>
@@ -132,6 +129,7 @@ const { userInfo, isLogin } = storeToRefs(userStore)
 
 const searchKeyword = ref('')
 const avatarLoadFailed = ref(false)
+const todayJobs = ref(156)
 
 const userAvatar = computed(() =>
 	resolveAvatar(isLogin.value ? userInfo.value?.avatar : '')
@@ -139,6 +137,23 @@ const userAvatar = computed(() =>
 const displayAvatar = computed(() =>
 	avatarLoadFailed.value ? DEFAULT_AVATAR : userAvatar.value
 )
+
+const userName = computed(() => {
+	if (isLogin.value && userInfo.value) {
+		return userInfo.value.nickname || userInfo.value.username || '同学'
+	}
+	return '张同学'
+})
+
+const greeting = computed(() => {
+	const hour = new Date().getHours()
+	if (hour < 6) return '夜深了'
+	if (hour < 9) return '早上好'
+	if (hour < 12) return '上午好'
+	if (hour < 14) return '中午好'
+	if (hour < 18) return '下午好'
+	return '晚上好'
+})
 
 watch(userAvatar, () => {
 	avatarLoadFailed.value = false
@@ -149,36 +164,25 @@ function onAvatarError() {
 }
 
 const startExplore = () => {
-	console.log('开始探索')
+	window.location.href = '/#/pages/Job/Job'
 }
 
 const goToResume = () => {
-	uni.navigateTo({ url: '/pages/Resume/Resume' })
+	window.location.href = '/#/pages/Resume/Resume'
 }
 
 const goToJob = () => {
-	uni.navigateTo({ url: '/pages/job/job' })
+	window.location.href = '/#/pages/Job/Job'
 }
 
 const goToInterview = () => {
-	uni.navigateTo({ url: '/pages/Interview/Interview' })
+	window.location.href = '/#/pages/Interview/Interview'
 }
-
-console.log('首页已加载')
 </script>
 
 <style scoped lang="scss">
-.home-container {
-	display: flex;
-	height: 100vh;
-	background-color: #f9fafb;
-}
-
-.main-content {
-	flex: 1;
-	margin-left: 20%;
-	padding: 48rpx;
-	overflow-y: auto;
+.home-main {
+	padding: 24px 32px 40px;
 }
 
 // 顶部搜索栏
@@ -186,23 +190,30 @@ console.log('首页已加载')
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: 48rpx;
+	margin-bottom: 24px;
 }
 
 .search-wrapper {
 	display: flex;
 	align-items: center;
-	width: 1000rpx;
-	height: 88rpx;
-	background: #ffffff;
-	border-radius: 16rpx;
-	padding: 0 32rpx;
-	border: 2rpx solid #e5e7eb;
+	width: 480px;
+	height: 44px;
+	background: var(--bg-card);
+	border-radius: var(--radius-md);
+	padding: 0 16px;
+	border: 1px solid var(--border-color);
+	transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+
+	&:focus-within {
+		border-color: var(--primary-light);
+		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+	}
 }
 
 .search-icon {
-	font-size: 36rpx;
-	margin-right: 16rpx;
+	font-size: 16px;
+	margin-right: 10px;
+	opacity: 0.5;
 }
 
 .search-input {
@@ -210,117 +221,171 @@ console.log('首页已加载')
 	height: 100%;
 	border: none;
 	outline: none;
-	font-size: 28rpx;
-}
+	font-size: 14px;
+	background: transparent;
 
-.search-placeholder {
-	color: #9ca3af;
+	&::placeholder {
+		color: var(--text-muted);
+	}
 }
 
 .top-right {
 	display: flex;
 	align-items: center;
-	gap: 32rpx;
+	gap: 16px;
 }
 
 .notification {
 	position: relative;
 	cursor: pointer;
+	padding: 8px;
+	border-radius: var(--radius-sm);
+	transition: background var(--transition-fast);
+
+	&:hover {
+		background: rgba(0, 0, 0, 0.05);
+	}
 }
 
 .bell-icon {
-	font-size: 48rpx;
+	font-size: 20px;
 }
 
 .badge {
 	position: absolute;
-	top: -16rpx;
-	right: -16rpx;
-	background: #ef4444;
+	top: 4px;
+	right: 4px;
+	background: var(--danger-color);
 	color: white;
-	font-size: 24rpx;
-	padding: 4rpx 12rpx;
-	border-radius: 20rpx;
-	min-width: 36rpx;
+	font-size: 10px;
+	padding: 1px 5px;
+	border-radius: 10px;
+	min-width: 16px;
 	text-align: center;
+	font-weight: 600;
 }
 
 .user-avatar {
-	width: 80rpx;
-	height: 80rpx;
+	width: 36px;
+	height: 36px;
 	border-radius: 50%;
 	cursor: pointer;
+	border: 2px solid var(--border-color);
+	transition: border-color var(--transition-fast);
+
+	&:hover {
+		border-color: var(--primary-light);
+	}
 }
 
 // 欢迎横幅
 .welcome-banner {
 	background: linear-gradient(135deg, #1e40af, #06b6d4);
-	border-radius: 32rpx;
-	padding: 64rpx;
-	margin-bottom: 64rpx;
+	border-radius: var(--radius-lg);
+	padding: 36px 40px;
+	margin-bottom: 24px;
 	color: white;
+	position: relative;
+	overflow: hidden;
+
+	&::before {
+		content: '';
+		position: absolute;
+		top: -50%;
+		right: -10%;
+		width: 300px;
+		height: 300px;
+		background: rgba(255, 255, 255, 0.05);
+		border-radius: 50%;
+	}
+
+	&::after {
+		content: '';
+		position: absolute;
+		bottom: -30%;
+		right: 10%;
+		width: 200px;
+		height: 200px;
+		background: rgba(255, 255, 255, 0.05);
+		border-radius: 50%;
+	}
 }
 
 .banner-content {
 	display: flex;
 	flex-direction: column;
-	gap: 24rpx;
+	gap: 12px;
+	position: relative;
+	z-index: 1;
 }
 
 .greeting {
-	font-size: 56rpx;
-	font-weight: 600;
+	font-size: 28px;
+	font-weight: 700;
 }
 
 .description {
-	font-size: 30rpx;
+	font-size: 15px;
 	opacity: 0.95;
+	max-width: 600px;
+	line-height: 1.5;
 }
 
 .start-btn {
 	background: white;
 	color: #1e40af;
 	border: none;
-	border-radius: 16rpx;
-	padding: 24rpx 48rpx;
-	font-size: 30rpx;
-	font-weight: 500;
+	border-radius: var(--radius-md);
+	padding: 10px 24px;
+	font-size: 14px;
+	font-weight: 600;
 	cursor: pointer;
 	display: inline-flex;
 	align-items: center;
-	gap: 12rpx;
-	margin-top: 16rpx;
-	transition: all 0.3s;
+	gap: 8px;
+	margin-top: 4px;
+	width: fit-content;
+	transition: all 0.25s ease;
 
 	&:hover {
-		transform: translateY(-4rpx);
-		box-shadow: 0 8rpx 24rpx rgba(255, 255, 255, 0.3);
+		transform: translateY(-2px);
+		box-shadow: 0 8px 20px rgba(255, 255, 255, 0.25);
+	}
+
+	&:active {
+		transform: translateY(0);
 	}
 }
 
 .btn-arrow {
-	font-size: 32rpx;
+	font-size: 16px;
+	transition: transform 0.2s ease;
+}
+
+.start-btn:hover .btn-arrow {
+	transform: translateX(4px);
 }
 
 // 功能卡片
 .cards-container {
-	display: flex;
-	gap: 48rpx;
-	margin-bottom: 64rpx;
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 20px;
+	margin-bottom: 24px;
 }
 
 .card-item {
-	flex: 1;
-	background: white;
-	border-radius: 32rpx;
-	padding: 48rpx;
-	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
-	transition: all 0.3s;
+	background: var(--bg-card);
+	border-radius: var(--radius-lg);
+	padding: 24px;
+	border: 1px solid var(--border-color);
+	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 	cursor: pointer;
 
 	&:hover {
-		transform: translateY(-8rpx);
-		box-shadow: 0 16rpx 32rpx rgba(0, 0, 0, 0.15);
+		transform: translateY(-4px);
+		box-shadow: var(--shadow-lg);
+		border-color: transparent;
 	}
 }
 
@@ -328,17 +393,17 @@ console.log('首页已加载')
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: 32rpx;
+	margin-bottom: 16px;
 }
 
 .card-icon {
-	width: 112rpx;
-	height: 112rpx;
-	border-radius: 24rpx;
+	width: 48px;
+	height: 48px;
+	border-radius: 12px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 56rpx;
+	font-size: 24px;
 
 	&.resume-icon {
 		background: linear-gradient(135deg, #3b82f6, #06b6d4);
@@ -359,45 +424,46 @@ console.log('首页已加载')
 
 .status-badge {
 	background: #f3f4f6;
-	color: #6b7280;
-	font-size: 26rpx;
-	padding: 12rpx 24rpx;
-	border-radius: 24rpx;
+	color: var(--text-secondary);
+	font-size: 12px;
+	padding: 4px 10px;
+	border-radius: 20px;
+	font-weight: 500;
 }
 
 .card-body {
 	display: flex;
 	flex-direction: column;
-	gap: 24rpx;
+	gap: 8px;
 }
 
 .card-title {
-	font-size: 40rpx;
+	font-size: 18px;
 	font-weight: 600;
-	color: #1f2937;
+	color: var(--text-primary);
 }
 
 .card-desc {
-	font-size: 28rpx;
-	color: #6b7280;
+	font-size: 13px;
+	color: var(--text-secondary);
 	line-height: 1.6;
 }
 
 .action-btn {
-	background: #1e40af;
 	color: white;
 	border: none;
-	border-radius: 16rpx;
-	padding: 24rpx 40rpx;
-	font-size: 30rpx;
-	font-weight: 500;
+	border-radius: var(--radius-md);
+	padding: 10px 20px;
+	font-size: 13px;
+	font-weight: 600;
 	cursor: pointer;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 12rpx;
-	transition: all 0.3s;
-	margin-top: 16rpx;
+	gap: 6px;
+	transition: all 0.25s ease;
+	margin-top: 8px;
+	width: fit-content;
 
 	&.resume-btn {
 		background: linear-gradient(135deg, #3b82f6, #06b6d4);
@@ -413,51 +479,85 @@ console.log('首页已加载')
 
 	&:hover {
 		opacity: 0.9;
-		transform: translateY(-4rpx);
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	}
+
+	&:active {
+		transform: translateY(0);
 	}
 }
 
 // 底部区域
 .bottom-section {
-	display: flex;
-	gap: 48rpx;
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 20px;
 }
 
 .section-item {
-	flex: 1;
-	background: white;
-	border-radius: 24rpx;
-	padding: 40rpx 48rpx;
+	background: var(--bg-card);
+	border-radius: var(--radius-md);
+	padding: 20px 24px;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
+	border: 1px solid var(--border-color);
+	cursor: pointer;
+	transition: all 0.2s ease;
+
+	&:hover {
+		border-color: var(--primary-light);
+		box-shadow: var(--shadow-sm);
+	}
 }
 
 .section-left {
 	display: flex;
 	align-items: center;
-	gap: 24rpx;
+	gap: 12px;
 }
 
 .section-icon {
-	font-size: 40rpx;
+	font-size: 20px;
 }
 
 .section-title {
-	font-size: 32rpx;
+	font-size: 15px;
 	font-weight: 500;
-	color: #1f2937;
+	color: var(--text-primary);
 }
 
 .section-action {
-	color: #3b82f6;
-	font-size: 28rpx;
+	color: var(--primary-light);
+	font-size: 13px;
 	cursor: pointer;
-	transition: color 0.3s;
+	font-weight: 500;
+	transition: color 0.2s;
 
 	&:hover {
-		color: #2563eb;
+		color: var(--primary-color);
+	}
+}
+
+// Responsive
+@media (max-width: 1200px) {
+	.cards-container {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (max-width: 768px) {
+	.cards-container {
+		grid-template-columns: 1fr;
+	}
+
+	.bottom-section {
+		grid-template-columns: 1fr;
+	}
+
+	.search-wrapper {
+		width: 300px;
 	}
 }
 </style>

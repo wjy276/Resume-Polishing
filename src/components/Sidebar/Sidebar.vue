@@ -1,17 +1,7 @@
 <template>
 	<view class="sidebar">
-		<!-- 页面切换加载遮罩 -->
-		<view class="loading-overlay" :class="{ show: isNavigating }">
-			<view class="loading-spinner">
-				<view class="spinner-ring"></view>
-				<view class="spinner-ring"></view>
-				<view class="spinner-ring"></view>
-			</view>
-			<text class="loading-text">{{ loadingText }}</text>
-		</view>
-
 		<!-- Logo 区域 -->
-		<view class="logo-section">
+		<view class="logo-section" @click="navigate('home')">
 			<view class="logo-icon">
 				<text class="logo-star">✦</text>
 			</view>
@@ -21,18 +11,6 @@
 			</view>
 		</view>
 
-		<!-- 身份切换 -->
-		<!-- <view class="role-switch">
-			<view class="role-btn active">
-				<text class="role-icon">🎓</text>
-				<text>学生</text>
-			</view>
-			<view class="role-btn">
-				<text class="role-icon">👥</text>
-				<text>辅导员</text>
-			</view>
-		</view> -->
-
 		<!-- 导航菜单 -->
 		<view class="nav-menu">
 			<view
@@ -40,7 +18,7 @@
 				:key="item.id"
 				class="nav-item"
 				:class="{ active: currentPage === item.id }"
-				@click="switchPage(item.id)"
+				@click="navigate(item.id)"
 			>
 				<text class="nav-icon">{{ item.icon }}</text>
 				<text class="nav-text">{{ item.name }}</text>
@@ -61,7 +39,7 @@
 					<text class="major">{{ userMajor }}</text>
 				</view>
 			</view>
-			<text class="settings-icon" v-if="isLogin" @click="handleSettingsClick">⚙</text>
+			<text class="settings-icon" v-if="isLogin" @click.stop="handleSettingsClick">⚙</text>
 			<text class="login-hint" v-else>登录</text>
 		</view>
 
@@ -74,7 +52,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import LoginPopup from '@/components/LoginPopup/LoginPopup.vue'
 import { DEFAULT_AVATAR, resolveAvatar } from '@/utils/avatar'
 
@@ -94,12 +72,16 @@ const menuItems = ref([
 	{ id: 'my', name: '我的', icon: '👤' }
 ])
 
-// 当前页面
-const currentPage = ref('home')
-
-// 导航加载状态
-const isNavigating = ref(false)
-const loadingText = ref('加载中...')
+// 当前页面 - 从 URL hash 计算（H5 hash 路由模式）
+const currentPage = computed(() => {
+	const hash = window.location.hash || ''
+	if (hash.includes('/Job')) return 'job'
+	if (hash.includes('/Resume/ResumeEditor')) return 'resume'
+	if (hash.includes('/Resume')) return 'resume'
+	if (hash.includes('/Interview')) return 'interview'
+	if (hash.includes('/My')) return 'my'
+	return 'home'
+})
 
 // 用户信息计算属性
 const userName = computed(() => {
@@ -126,21 +108,8 @@ const displayAvatar = computed(() =>
 	avatarLoadFailed.value ? DEFAULT_AVATAR : userAvatar.value
 )
 
-watch(userAvatar, () => {
-	avatarLoadFailed.value = false
-})
-
 function onAvatarError() {
 	avatarLoadFailed.value = true
-}
-
-// 加载文字配置
-const loadingTexts = {
-	home: '正在进入首页...',
-	job: '正在加载职位...',
-	resume: '正在准备简历...',
-	interview: '正在启动面试...',
-	my: '正在加载个人中心...'
 }
 
 // 检查登录状态
@@ -157,86 +126,38 @@ const checkLoginStatus = () => {
 	}
 }
 
-// 根据当前路由路径获取页面ID
-const getPageIdFromRoute = () => {
-	const pages = getCurrentPages()
-	if (pages.length > 0) {
-		const currentPage = pages[pages.length - 1]
-		const route = currentPage.route || ''
-		// 匹配路由路径
-		if (route.includes('Home')) return 'home'
-		if (route.includes('Job')) return 'job'
-		if (route.includes('Resume')) return 'resume'
-		if (route.includes('Interview')) return 'interview'
-		if (route.includes('My')) return 'my'
-	}
-	return 'home'
+// 页面映射
+const pageMap = {
+	home: '/#/pages/Home/Home',
+	job: '/#/pages/Job/Job',
+	resume: '/#/pages/Resume/Resume',
+	interview: '/#/pages/Interview/Interview',
+	my: '/#/pages/My/My'
 }
 
-// 切换页面
-const switchPage = (pageId) => {
-	// 如果正在导航或已经是当前页面，直接返回
-	if (isNavigating.value || currentPage.value === pageId) return
+// 导航 - 使用 window.location 直接跳转，避免 uni-app 路由的闪烁问题
+const navigate = (pageId) => {
+	if (currentPage.value === pageId) return
 
-	// 显示加载动画
-	isNavigating.value = true
-	loadingText.value = loadingTexts[pageId] || '加载中...'
-
-	// 先更新状态，确保高光立即显示
-	currentPage.value = pageId
-
-	// 使用 uni-app 路由跳转
-	const pageMap = {
-		home: '/pages/Home/Home',
-		job: '/pages/Job/Job',
-		resume: '/pages/Resume/Resume',
-		interview: '/pages/Interview/Interview',
-		my: '/pages/My/My'
-	}
-
-	if (pageMap[pageId]) {
-		// 延迟一点跳转，让动画先显示
+	const url = pageMap[pageId]
+	if (url) {
+		// 添加淡入动画类
+		document.body.classList.add('page-transitioning')
 		setTimeout(() => {
-			uni.redirectTo({
-				url: pageMap[pageId],
-				success: () => {
-					// 页面跳转成功后隐藏加载
-					setTimeout(() => {
-						isNavigating.value = false
-					}, 100)
-				},
-				fail: () => {
-					// 如果 redirectTo 失败，尝试 navigateTo
-					uni.navigateTo({
-						url: pageMap[pageId],
-						success: () => {
-							setTimeout(() => {
-								isNavigating.value = false
-							}, 100)
-						},
-						fail: () => {
-							isNavigating.value = false
-							console.log('页面跳转失败')
-						}
-					})
-				}
-			})
-		}, 150)
+			window.location.href = url
+		}, 50)
 	}
 }
 
 // 点击设置图标
 const handleSettingsClick = (e) => {
-	// 阻止事件冒泡，避免触发 handleUserClick
 	if (e) e.stopPropagation()
-
 	if (!isLogin.value) return
 
 	uni.showActionSheet({
 		itemList: ['退出登录'],
 		success: (res) => {
 			if (res.tapIndex === 0) {
-				// 点击了退出登录
 				uni.showModal({
 					title: '提示',
 					content: '确定要退出登录吗？',
@@ -244,22 +165,13 @@ const handleSettingsClick = (e) => {
 					cancelText: '取消',
 					success: (modalRes) => {
 						if (modalRes.confirm) {
-							// 清除登录信息
 							uni.removeStorageSync('token')
 							uni.removeStorageSync('userInfo')
-
-							// 更新状态
 							isLogin.value = false
 							userInfo.value = null
-
-							uni.showToast({
-								title: '已退出登录',
-								icon: 'success'
-							})
-
-							// 跳转到首页
+							uni.showToast({ title: '已退出登录', icon: 'success' })
 							setTimeout(() => {
-								switchPage('home')
+								window.location.href = '/#/pages/Home/Home'
 							}, 500)
 						}
 					}
@@ -272,120 +184,26 @@ const handleSettingsClick = (e) => {
 // 点击用户区域
 const handleUserClick = () => {
 	if (isLogin.value) {
-		// 已登录，跳转到个人中心
-		switchPage('my')
+		navigate('my')
 	} else {
-		// 未登录，显示登录弹窗
 		showLoginPopup.value = true
 	}
 }
 
 // 登录成功回调
 const handleLoginSuccess = () => {
-	// 重新检查登录状态
 	checkLoginStatus()
 }
 
-// 组件挂载时同步当前页面状态
+// 组件挂载时检查登录状态
 onMounted(() => {
-	currentPage.value = getPageIdFromRoute()
-	// 检查登录状态
 	checkLoginStatus()
 })
 </script>
 
 <style scoped lang="scss">
 $sidebar-bg: #1e3a8a;
-$sidebar-width: 400rpx;
-
-// 加载遮罩样式
-.loading-overlay {
-	position: fixed;
-	top: 0;
-	left: $sidebar-width;
-	right: 0;
-	bottom: 0;
-	background: rgba(255, 255, 255, 0.95);
-	backdrop-filter: blur(8rpx);
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	z-index: 9999;
-	opacity: 0;
-	visibility: hidden;
-	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-	&.show {
-		opacity: 1;
-		visibility: visible;
-
-		.loading-spinner {
-			.spinner-ring {
-				animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-
-				&:nth-child(1) {
-					animation-delay: -0.45s;
-				}
-				&:nth-child(2) {
-					animation-delay: -0.3s;
-				}
-				&:nth-child(3) {
-					animation-delay: -0.15s;
-				}
-			}
-		}
-
-		.loading-text {
-			animation: fadeInUp 0.4s ease forwards;
-		}
-	}
-}
-
-.loading-spinner {
-	display: flex;
-	gap: 16rpx;
-	margin-bottom: 32rpx;
-
-	.spinner-ring {
-		width: 24rpx;
-		height: 24rpx;
-		border-radius: 50%;
-		background: linear-gradient(135deg, #3b82f6, #06b6d4);
-		animation: none;
-	}
-}
-
-.loading-text {
-	font-size: 28rpx;
-	color: #1e3a8a;
-	font-weight: 500;
-	letter-spacing: 2rpx;
-	opacity: 0;
-	transform: translateY(20rpx);
-}
-
-@keyframes spin {
-	0% {
-		transform: scale(1);
-		opacity: 1;
-	}
-	50% {
-		transform: scale(0.5);
-		opacity: 0.5;
-	}
-	100% {
-		transform: scale(1);
-		opacity: 1;
-	}
-}
-
-@keyframes fadeInUp {
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
+$sidebar-width: 240px;
 
 .sidebar {
 	width: $sidebar-width;
@@ -393,37 +211,43 @@ $sidebar-width: 400rpx;
 	color: #ffffff;
 	display: flex;
 	flex-direction: column;
-	padding: 48rpx;
+	padding: 32px 24px;
 	height: 100vh;
 	position: fixed;
 	left: 0;
 	top: 0;
 	z-index: 1000;
-	box-shadow: 4rpx 0 16rpx rgba(0, 0, 0, 0.1);
+	box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
 }
 
 .logo-section {
 	display: flex;
 	align-items: center;
-	margin-bottom: 64rpx;
-	padding-bottom: 48rpx;
-	border-bottom: 2rpx solid rgba(255, 255, 255, 0.1);
+	margin-bottom: 40px;
+	padding-bottom: 24px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	cursor: pointer;
+	transition: opacity 0.2s;
+
+	&:hover {
+		opacity: 0.9;
+	}
 }
 
 .logo-icon {
-	width: 96rpx;
-	height: 96rpx;
+	width: 44px;
+	height: 44px;
 	background: linear-gradient(135deg, #3b82f6, #06b6d4);
-	border-radius: 24rpx;
+	border-radius: 12px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	margin-right: 24rpx;
+	margin-right: 12px;
 	flex-shrink: 0;
 }
 
 .logo-star {
-	font-size: 48rpx;
+	font-size: 22px;
 	color: #ffffff;
 }
 
@@ -433,193 +257,156 @@ $sidebar-width: 400rpx;
 }
 
 .logo-title {
-	font-size: 40rpx;
+	font-size: 18px;
 	font-weight: 600;
-	margin-bottom: 8rpx;
+	margin-bottom: 2px;
 	white-space: nowrap;
 }
 
 .logo-subtitle {
-	font-size: 24rpx;
-	opacity: 0.8;
+	font-size: 12px;
+	opacity: 0.7;
 	white-space: nowrap;
-}
-
-.role-switch {
-	display: flex;
-	gap: 16rpx;
-	margin-bottom: 48rpx;
-}
-
-.role-btn {
-	flex: 1;
-	padding: 20rpx 32rpx;
-	border-radius: 16rpx;
-	background: rgba(255, 255, 255, 0.1);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: 12rpx;
-	cursor: pointer;
-	transition: all 0.3s;
-	font-size: 28rpx;
-	border: none;
-	color: #ffffff;
-
-	&.active {
-		background: #ffffff;
-		color: $sidebar-bg;
-		font-weight: 500;
-	}
-
-	&:hover {
-		background: rgba(255, 255, 255, 0.2);
-	}
 }
 
 .nav-menu {
 	flex: 1;
 	display: flex;
 	flex-direction: column;
-	gap: 16rpx;
+	gap: 6px;
 }
 
 .nav-item {
-	padding: 28rpx 32rpx;
-	border-radius: 16rpx;
+	padding: 12px 16px;
+	border-radius: 10px;
 	display: flex;
 	align-items: center;
-	gap: 24rpx;
+	gap: 12px;
 	cursor: pointer;
-	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 	position: relative;
 	overflow: hidden;
+	border: none;
+	background: transparent;
+	color: inherit;
 
-	// 点击波纹效果基础
 	&::before {
 		content: '';
 		position: absolute;
-		top: 50%;
-		left: 50%;
-		width: 0;
-		height: 0;
-		background: rgba(255, 255, 255, 0.3);
-		border-radius: 50%;
-		transform: translate(-50%, -50%);
-		transition: width 0.6s ease, height 0.6s ease;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: 3px;
+		background: #60a5fa;
+		border-radius: 0 3px 3px 0;
+		opacity: 0;
+		transform: scaleY(0);
+		transition: all 0.25s ease;
 	}
 
 	&.active {
-		background: linear-gradient(135deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.15));
-		box-shadow:
-			0 4rpx 12rpx rgba(0, 0, 0, 0.15),
-			inset 0 1rpx 0 rgba(255, 255, 255, 0.2);
-		backdrop-filter: blur(8rpx);
-		border: 1rpx solid rgba(255, 255, 255, 0.2);
+		background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08));
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+
+		&::before {
+			opacity: 1;
+			transform: scaleY(1);
+		}
 
 		.nav-text {
 			font-weight: 600;
-			letter-spacing: 1rpx;
 		}
 
 		.nav-icon {
 			transform: scale(1.1);
-			filter: drop-shadow(0 2rpx 4rpx rgba(0, 0, 0, 0.2));
-		}
-
-		// 左侧高光指示条
-		&::after {
-			content: '';
-			position: absolute;
-			left: 0;
-			top: 50%;
-			transform: translateY(-50%);
-			width: 6rpx;
-			height: 60%;
-			background: linear-gradient(180deg, #ffffff, rgba(255, 255, 255, 0.6));
-			border-radius: 0 3rpx 3rpx 0;
-			box-shadow: 0 0 12rpx rgba(255, 255, 255, 0.5);
 		}
 	}
 
 	&:hover:not(.active) {
-		background: rgba(255, 255, 255, 0.12);
-		transform: translateX(8rpx);
+		background: rgba(255, 255, 255, 0.1);
+		transform: translateX(4px);
 	}
 
 	&:active {
 		transform: scale(0.98);
-		background: rgba(255, 255, 255, 0.2);
-
-		&::before {
-			width: 200%;
-			height: 200%;
-		}
 	}
 }
 
 .nav-icon {
-	font-size: 36rpx;
-	width: 40rpx;
+	font-size: 18px;
+	width: 24px;
 	text-align: center;
-	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	transition: all 0.25s ease;
+	display: inline-block;
 }
 
 .nav-text {
-	font-size: 30rpx;
-	transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	font-size: 14px;
+	transition: all 0.25s ease;
 }
 
 .user-info {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin-bottom: 70rpx;
-	padding-top: 48rpx;
-	border-top: 2rpx solid rgba(255, 255, 255, 0.1);
+	margin-top: auto;
+	padding-top: 20px;
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+	cursor: pointer;
+	transition: opacity 0.2s;
+
+	&:hover {
+		opacity: 0.9;
+	}
 }
 
 .avatar-wrapper {
 	display: flex;
 	align-items: center;
-	gap: 24rpx;
+	gap: 10px;
 	flex: 1;
+	min-width: 0;
 }
 
 .avatar-image {
-	width: 96rpx;
-	height: 96rpx;
+	width: 36px;
+	height: 36px;
 	border-radius: 50%;
 	flex-shrink: 0;
+	border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 .avatar-details {
 	display: flex;
 	flex-direction: column;
-	gap: 8rpx;
+	gap: 2px;
+	min-width: 0;
 	overflow: hidden;
 }
 
 .name {
-	font-size: 28rpx;
+	font-size: 13px;
 	font-weight: 500;
 	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .major {
-	font-size: 24rpx;
-	opacity: 0.8;
+	font-size: 11px;
+	opacity: 0.7;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 
 .settings-icon {
-	font-size: 40rpx;
-	opacity: 0.8;
+	font-size: 18px;
+	opacity: 0.7;
 	cursor: pointer;
 	flex-shrink: 0;
-	transition: opacity 0.3s;
+	transition: opacity 0.2s;
+	padding: 4px;
 
 	&:hover {
 		opacity: 1;
@@ -627,10 +414,18 @@ $sidebar-width: 400rpx;
 }
 
 .login-hint {
-	font-size: 26rpx;
+	font-size: 12px;
 	color: #93c5fd;
 	font-weight: 500;
 	cursor: pointer;
 	flex-shrink: 0;
+	padding: 4px 8px;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.1);
+	transition: background 0.2s;
+
+	&:hover {
+		background: rgba(255, 255, 255, 0.2);
+	}
 }
 </style>

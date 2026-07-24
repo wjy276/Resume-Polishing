@@ -89,8 +89,14 @@ const aiStore = useAIOptimizeStore()
 // 注意：返回的是 reactive 数组，v-model="exp.company" 直接 mutate 即实时响应
 const list = computed(() => store.activeResume?.experience || [])
 const expanded = ref(null)
+let toggleLock = false
 
-function toggle(id) { expanded.value = expanded.value === id ? null : id }
+function toggle(id) {
+	if (toggleLock) return
+	toggleLock = true
+	expanded.value = expanded.value === id ? null : id
+	setTimeout(() => { toggleLock = false }, 200)
+}
 
 function addItem() {
 	const id = store.addExperience({ company: '', position: '', date: '', details: '' })

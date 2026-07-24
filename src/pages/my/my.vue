@@ -1,13 +1,9 @@
 <!-- 个人详情页面 -->
 
-
 <template>
-	<view class="my-container">
-		<!-- 侧边栏 -->
+	<view class="page-layout">
 		<Sidebar />
-		
-		<!-- 主内容区 -->
-		<view class="main-content">
+		<view class="page-main my-main">
 			<!-- 用户信息头部 -->
 			<view class="user-header">
 				<view class="avatar-section">
@@ -114,7 +110,6 @@ const settingMenus = ref([
 ])
 
 const handleMenuClick = (item) => {
-	console.log('点击菜单:', item.name)
 	uni.showToast({
 		title: `功能开发中：${item.name}`,
 		icon: 'none'
@@ -124,83 +119,81 @@ const handleMenuClick = (item) => {
 const editProfile = () => {
 	console.log('编辑资料')
 }
-
-
 </script>
 
 <style scoped lang="scss">
-.my-container {
-	display: flex;
-	height: 100vh;
-	background-color: #f9fafb;
-}
-
-.main-content {
-	flex: 1;
-	margin-left: 20%;
-	padding: 64rpx;
-	overflow-y: auto;
+.my-main {
+	padding: 20px 32px 40px;
 }
 
 // 用户信息头部
 .user-header {
-	background: #ffffff;
-	padding: 64rpx;
-	border-radius: 32rpx;
-	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
-	margin-bottom: 48rpx;
+	background: var(--bg-card);
+	padding: 28px 32px;
+	border-radius: var(--radius-md);
+	box-shadow: var(--shadow-sm);
+	border: 1px solid var(--border-color);
+	margin-bottom: 20px;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
+	transition: all 0.25s ease;
+
+	&:hover {
+		box-shadow: var(--shadow-md);
+	}
 }
 
 .avatar-section {
 	display: flex;
 	align-items: center;
-	gap: 40rpx;
+	gap: 20px;
 }
 
 .user-avatar {
-	width: 160rpx;
-	height: 160rpx;
+	width: 72px;
+	height: 72px;
 	border-radius: 50%;
+	object-fit: cover;
+	border: 2px solid var(--border-color);
 }
 
 .user-info {
 	display: flex;
 	flex-direction: column;
-	gap: 16rpx;
+	gap: 4px;
 }
 
 .user-name {
-	font-size: 48rpx;
-	font-weight: 600;
-	color: #111827;
+	font-size: 20px;
+	font-weight: 700;
+	color: var(--text-primary);
 }
 
 .user-major {
-	font-size: 28rpx;
-	color: #6b7280;
+	font-size: 14px;
+	color: var(--text-secondary);
 }
 
 .user-stats {
-	font-size: 26rpx;
-	color: #3b82f6;
+	font-size: 13px;
+	color: var(--primary-light);
 }
 
 .edit-btn {
-	background: #3b82f6;
-	color: #ffffff;
+	background: var(--primary-light);
+	color: #fff;
 	border: none;
-	padding: 24rpx 48rpx;
-	border-radius: 16rpx;
-	font-size: 30rpx;
+	padding: 8px 20px;
+	border-radius: var(--radius-sm);
+	font-size: 13px;
 	font-weight: 500;
 	cursor: pointer;
-	transition: all 0.3s;
+	transition: all 0.15s;
 
 	&:hover {
 		background: #2563eb;
+		transform: translateY(-1px);
 	}
 }
 
@@ -208,67 +201,78 @@ const editProfile = () => {
 .menu-section {
 	display: flex;
 	flex-direction: column;
-	gap: 40rpx;
+	gap: 16px;
 }
 
 .menu-group {
-	background: #ffffff;
-	border-radius: 24rpx;
+	background: var(--bg-card);
+	border-radius: var(--radius-md);
 	overflow: hidden;
-	box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
+	box-shadow: var(--shadow-sm);
+	border: 1px solid var(--border-color);
+	transition: all 0.25s ease;
+
+	&:hover {
+		box-shadow: var(--shadow-md);
+	}
 }
 
 .group-title {
 	display: block;
-	padding: 32rpx 40rpx;
+	padding: 14px 20px;
 	background: #f9fafb;
-	font-size: 28rpx;
+	font-size: 13px;
 	font-weight: 600;
-	color: #6b7280;
-	border-bottom: 2rpx solid #e5e7eb;
+	color: var(--text-secondary);
+	border-bottom: 1px solid var(--border-color);
 }
 
 .menu-item {
 	display: flex;
 	align-items: center;
-	padding: 32rpx 40rpx;
+	padding: 14px 20px;
 	cursor: pointer;
-	transition: all 0.3s;
+	transition: all 0.15s;
 
 	&:hover {
 		background: #f9fafb;
 	}
+
+	&:not(:last-child) {
+		border-bottom: 1px solid #f3f4f6;
+	}
 }
 
 .menu-icon {
-	font-size: 40rpx;
-	margin-right: 24rpx;
-	width: 48rpx;
+	font-size: 20px;
+	margin-right: 12px;
+	width: 24px;
 	text-align: center;
 }
 
 .menu-text {
 	flex: 1;
-	font-size: 30rpx;
-	color: #111827;
+	font-size: 14px;
+	color: var(--text-primary);
 }
 
 .menu-extra {
 	display: flex;
 	align-items: center;
-	gap: 16rpx;
+	gap: 8px;
 }
 
 .menu-badge {
-	background: #ef4444;
-	color: #ffffff;
-	padding: 4rpx 16rpx;
-	border-radius: 20rpx;
-	font-size: 24rpx;
+	background: var(--danger-color);
+	color: #fff;
+	padding: 2px 8px;
+	border-radius: 10px;
+	font-size: 11px;
+	font-weight: 500;
 }
 
 .menu-arrow {
-	font-size: 48rpx;
-	color: #9ca3af;
+	font-size: 20px;
+	color: var(--text-muted);
 }
 </style>

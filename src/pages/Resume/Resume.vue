@@ -1,8 +1,8 @@
 <template>
-	<view class="resume-page">
+	<view class="page-layout">
 		<Sidebar />
 
-		<view class="main-content">
+		<view class="page-main resume-main">
 			<!-- Alert banner -->
 			<view v-if="!isLoggedIn" class="alert-banner alert-warn">
 				<text class="alert-icon">⚠</text>
@@ -48,7 +48,10 @@
 				<button class="ai-entry-btn">开始优化</button>
 			</view>
 
-			<view v-if="store.listLoading" class="loading-hint">正在加载简历...</view>
+			<view v-if="store.listLoading" class="loading-hint">
+				<view class="spinner" style="margin: 0 auto 12px"></view>
+				正在加载简历...
+			</view>
 
 			<!-- Resume grid -->
 			<view v-else class="resume-grid">
@@ -69,26 +72,22 @@
 					:key="resume.id"
 					class="resume-card"
 				>
-					<!-- Mini preview -->
 					<view class="card-preview" ref="cardRefs" @click="editResume(resume.id)">
 						<view class="preview-scaler" :style="scalerStyle(resume)">
 							<div class="preview-inner" :style="previewInnerStyle(resume)">
 								<ClassicTemplate :data="resume" />
 							</div>
 						</view>
-						<!-- Gradient fade at bottom -->
 						<view class="card-fade" />
-						<!-- Title overlay -->
 						<view class="card-overlay">
 							<text class="card-resume-title">{{ resume.title || '未命名简历' }}</text>
 							<text class="card-meta">经典模板 · {{ formatDate(resume.createdAt) }}</text>
 						</view>
 					</view>
 
-					<!-- Footer actions -->
 					<view class="card-footer">
-						<button class="card-btn" @click="editResume(resume.id)">编辑</button>
-						<button class="card-btn card-btn-danger" @click="confirmDelete(resume)">删除</button>
+						<button class="card-btn" @click.stop="editResume(resume.id)">编辑</button>
+						<button class="card-btn card-btn-danger" @click.stop="confirmDelete(resume)">删除</button>
 					</view>
 				</view>
 			</view>
@@ -111,12 +110,12 @@
 			<view class="modal-box upload-modal">
 				<text class="modal-title">上传简历</text>
 				<text class="modal-desc">支持 PDF、Word 格式，AI 将自动解析为结构化数据</text>
-				
+
 				<view class="upload-area" @click="triggerFileInput" :class="{ dragging: isDragging }">
-					<input 
+					<input
 						ref="fileInput"
-						type="file" 
-						accept=".pdf,.doc,.docx" 
+						type="file"
+						accept=".pdf,.doc,.docx"
 						style="display: none"
 						@change="handleFileSelect"
 					/>
@@ -176,7 +175,6 @@ const fileInput = ref(null)
 
 const isLoggedIn = computed(() => userStore.hasToken)
 
-// card width for scaling; roughly 200px per card column
 const CARD_PREVIEW_WIDTH = 200
 const A4_WIDTH_PX = 793.7
 
@@ -235,7 +233,7 @@ async function createResume() {
 			title: `新建简历 ${store.allResumes.length + 1}`,
 		})
 		if (result.success && result.id) {
-			uni.navigateTo({ url: `/pages/Resume/ResumeEditor?id=${result.id}` })
+			window.location.href = `/#/pages/Resume/ResumeEditor?id=${result.id}`
 		}
 	} finally {
 		uni.hideLoading()
@@ -249,7 +247,7 @@ async function editResume(id) {
 		await store.loadResumeFromServer(id)
 		uni.hideLoading()
 	}
-	uni.navigateTo({ url: `/pages/Resume/ResumeEditor?id=${id}` })
+	window.location.href = `/#/pages/Resume/ResumeEditor?id=${id}`
 }
 
 function confirmDelete(resume) {
@@ -260,27 +258,17 @@ async function doDelete() {
 	if (!deleteTarget.value) return
 	const id = deleteTarget.value.id
 	deleteTarget.value = null
-	
+
 	uni.showLoading({ title: '删除中...' })
 	const result = await store.deleteResumeOnServer(id)
 	uni.hideLoading()
-	
+
 	if (result.success) {
 		uni.showToast({ title: '删除成功', icon: 'success' })
-		// 刷新列表
 		await refreshList()
 	} else {
 		uni.showToast({ title: result.message || '删除失败', icon: 'none' })
 	}
-}
-
-function showImportTip() {
-	uni.showToast({ title: '导入功能开发中', icon: 'none' })
-}
-
-function showUploadModal() {
-	showUpload.value = true
-	selectedFile.value = null
 }
 
 function triggerFileInput() {
@@ -297,22 +285,21 @@ function handleFileSelect(e) {
 async function handleUpload() {
 	if (!selectedFile.value) return
 	uploading.value = true
-	
+
 	try {
 		const result = await aiStore.uploadAndParse(selectedFile.value)
-		
+
 		if (result.success && result.data) {
-			// 使用 AI 解析的数据创建简历
 			const resumeResult = await store.createResumeFromParsedData(
 				result.data,
 				`导入简历 - ${selectedFile.value.name}`
 			)
-			
+
 			if (resumeResult.success && resumeResult.id) {
 				uni.showToast({ title: '解析成功', icon: 'success' })
 				showUpload.value = false
 				await refreshList()
-				uni.navigateTo({ url: `/pages/Resume/ResumeEditor?id=${resumeResult.id}` })
+				window.location.href = `/#/pages/Resume/ResumeEditor?id=${resumeResult.id}`
 			} else {
 				uni.showToast({ title: resumeResult.message || '创建失败', icon: 'none' })
 			}
@@ -330,7 +317,7 @@ async function handleUpload() {
 function handleImported(resumeId) {
 	if (resumeId) {
 		refreshList()
-		uni.navigateTo({ url: `/pages/Resume/ResumeEditor?id=${resumeId}` })
+		window.location.href = `/#/pages/Resume/ResumeEditor?id=${resumeId}`
 	}
 }
 
@@ -339,7 +326,7 @@ function goToAIOptimize() {
 		uni.showToast({ title: '请先登录', icon: 'none' })
 		return
 	}
-	
+
 	if (allResumes.value.length === 0) {
 		uni.showModal({
 			title: '提示',
@@ -351,26 +338,15 @@ function goToAIOptimize() {
 		})
 		return
 	}
-	
+
 	const firstResume = allResumes.value[0]
-	uni.navigateTo({ url: `/pages/Resume/ResumeEditor?id=${firstResume.id}&aiOptimize=1` })
+	window.location.href = `/#/pages/Resume/ResumeEditor?id=${firstResume.id}&aiOptimize=1`
 }
 </script>
 
 <style scoped lang="scss">
-.resume-page {
-	display: flex;
-	height: 100vh;
-	background: #f9fafb;
-	overflow: hidden;
-}
-
-.main-content {
-	flex: 1;
-	margin-left: 20%;
-	padding: 0 32px 40px;
-	overflow-y: auto;
-	min-width: 0;
+.resume-main {
+	padding: 20px 32px 40px;
 }
 
 /* Alert */
@@ -379,9 +355,10 @@ function goToAIOptimize() {
 	align-items: center;
 	gap: 10px;
 	padding: 12px 16px;
-	border-radius: 8px;
+	border-radius: var(--radius-md);
 	border: 1px solid;
-	margin: 20px 0 0;
+	margin-bottom: 20px;
+	animation: slideUp 0.3s ease;
 }
 
 .alert-warn {
@@ -391,23 +368,21 @@ function goToAIOptimize() {
 }
 
 .alert-icon { font-size: 14px; flex-shrink: 0; }
-
 .alert-body { flex: 1; min-width: 0; }
-
 .alert-title { display: block; font-size: 13px; font-weight: 600; color: #991b1b; }
-
 .alert-desc { display: block; font-size: 12px; color: #b91c1c; margin-top: 2px; }
 
 .alert-action {
 	background: transparent;
 	border: 1px solid #fca5a5;
 	color: #991b1b;
-	border-radius: 5px;
+	border-radius: var(--radius-sm);
 	padding: 4px 12px;
 	font-size: 12px;
 	cursor: pointer;
 	white-space: nowrap;
 	flex-shrink: 0;
+	transition: all 0.15s;
 
 	&:hover { background: #fee2e2; }
 }
@@ -417,20 +392,20 @@ function goToAIOptimize() {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin: 28px 0 20px;
+	margin-bottom: 20px;
 }
 
 .loading-hint {
 	padding: 48px 0;
 	text-align: center;
 	font-size: 14px;
-	color: #6b7280;
+	color: var(--text-secondary);
 }
 
 .page-title {
-	font-size: 28px;
+	font-size: 24px;
 	font-weight: 700;
-	color: #111827;
+	color: var(--text-primary);
 }
 
 .title-actions {
@@ -443,231 +418,36 @@ function goToAIOptimize() {
 	display: flex;
 	align-items: center;
 	gap: 5px;
-	padding: 7px 16px;
-	border: 1px solid #d1d5db;
-	border-radius: 7px;
-	background: #fff;
+	padding: 8px 16px;
+	border: 1px solid var(--border-color);
+	border-radius: var(--radius-sm);
+	background: var(--bg-card);
 	font-size: 13px;
-	color: #374151;
+	color: var(--text-secondary);
 	cursor: pointer;
 	transition: all 0.15s;
 
-	&:hover { border-color: #9ca3af; background: #f9fafb; }
+	&:hover { border-color: var(--primary-light); background: #eff6ff; color: var(--primary-light); }
 }
 
 .btn-primary {
 	display: flex;
 	align-items: center;
 	gap: 5px;
-	padding: 7px 16px;
-	background: #111827;
+	padding: 8px 16px;
+	background: var(--text-primary);
 	color: #fff;
 	border: none;
-	border-radius: 7px;
+	border-radius: var(--radius-sm);
 	font-size: 13px;
 	font-weight: 500;
 	cursor: pointer;
 	transition: background 0.15s;
 
-	&:hover { background: #1f2937; }
+	&:hover { background: #374151; }
 }
 
-/* Grid */
-.resume-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-	gap: 20px;
-}
-
-/* Card base */
-.resume-card {
-	border: 1px solid #e5e7eb;
-	border-radius: 10px;
-	overflow: hidden;
-	background: #fff;
-	aspect-ratio: 210 / 297;
-	display: flex;
-	flex-direction: column;
-	transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-	cursor: pointer;
-
-	&:hover {
-		border-color: rgba(37, 99, 235, 0.4);
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-		transform: translateY(-2px);
-	}
-}
-
-/* Create card */
-.card-new {
-	border-style: dashed;
-
-	&:hover { border-color: #93c5fd; background: #eff6ff; }
-}
-
-.card-new-inner {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	flex: 1;
-	gap: 10px;
-	padding: 20px;
-	text-align: center;
-}
-
-.plus-circle {
-	width: 52px;
-	height: 52px;
-	border-radius: 50%;
-	background: #f3f4f6;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	transition: background 0.15s;
-
-	.card-new:hover & { background: #dbeafe; }
-}
-
-.plus-icon { font-size: 22px; color: #6b7280; .card-new:hover & { color: #2563eb; } }
-
-.card-new-title { font-size: 14px; font-weight: 600; color: #111827; }
-
-.card-new-desc { font-size: 12px; color: #9ca3af; }
-
-/* Preview area */
-.card-preview {
-	flex: 1;
-	position: relative;
-	overflow: hidden;
-	background: #f9fafb;
-}
-
-.preview-scaler {
-	pointer-events: none;
-}
-
-.preview-inner {
-	pointer-events: none;
-}
-
-/* Gradient fade */
-.card-fade {
-	position: absolute;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	height: 55%;
-	background: linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.8) 40%, transparent 100%);
-	pointer-events: none;
-}
-
-/* Title overlay at bottom of preview */
-.card-overlay {
-	position: absolute;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	padding: 8px 10px 10px;
-	z-index: 2;
-}
-
-.card-resume-title {
-	display: block;
-	font-size: 13px;
-	font-weight: 600;
-	color: #111827;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.card-meta {
-	display: block;
-	font-size: 11px;
-	color: #6b7280;
-	margin-top: 2px;
-}
-
-/* Card footer */
-.card-footer {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 6px;
-	padding: 6px 8px 8px;
-	border-top: 1px solid #f3f4f6;
-	background: #fff;
-	flex-shrink: 0;
-}
-
-.card-btn {
-	padding: 5px;
-	border: 1px solid #e5e7eb;
-	border-radius: 5px;
-	background: #fff;
-	font-size: 12px;
-	color: #374151;
-	cursor: pointer;
-	text-align: center;
-	transition: background 0.15s;
-
-	&:hover { background: #f3f4f6; }
-}
-
-.card-btn-danger {
-	color: #ef4444;
-
-	&:hover { background: #fef2f2; border-color: #fca5a5; }
-}
-
-/* Delete modal */
-.modal-overlay {
-	position: fixed;
-	inset: 0;
-	background: rgba(0, 0, 0, 0.45);
-	z-index: 100;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.modal-box {
-	background: #fff;
-	border-radius: 12px;
-	padding: 28px 28px 20px;
-	width: 380px;
-	max-width: 90vw;
-	box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15);
-}
-
-.modal-title { display: block; font-size: 17px; font-weight: 700; color: #111827; margin-bottom: 10px; }
-
-.modal-desc { display: block; font-size: 13px; color: #6b7280; line-height: 1.6; margin-bottom: 20px; }
-
-.modal-actions {
-	display: flex;
-	justify-content: flex-end;
-	gap: 10px;
-}
-
-.btn-danger {
-	padding: 7px 18px;
-	background: #ef4444;
-	color: #fff;
-	border: none;
-	border-radius: 6px;
-	font-size: 13px;
-	font-weight: 500;
-	cursor: pointer;
-
-	&:hover { background: #dc2626; }
-}
-
-@media (max-width: 1200px) {
-	.main-content { margin-left: 240px; }
-}
-
-/* AI 优化入口卡片 */
+/* AI Entry Card */
 .ai-entry-card {
 	display: flex;
 	align-items: center;
@@ -676,14 +456,14 @@ function goToAIOptimize() {
 	margin-bottom: 24px;
 	background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
 	border: 1px solid #bfdbfe;
-	border-radius: 12px;
+	border-radius: var(--radius-md);
 	cursor: pointer;
-	transition: all 0.2s;
+	transition: all 0.25s ease;
 
 	&:hover {
 		border-color: #93c5fd;
-		box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
-		transform: translateY(-1px);
+		box-shadow: 0 4px 16px rgba(59, 130, 246, 0.12);
+		transform: translateY(-2px);
 	}
 }
 
@@ -726,16 +506,188 @@ function goToAIOptimize() {
 	background: linear-gradient(135deg, #3b82f6, #2563eb);
 	color: #fff;
 	border: none;
-	border-radius: 8px;
+	border-radius: var(--radius-sm);
 	font-size: 14px;
 	font-weight: 500;
 	cursor: pointer;
-	transition: opacity 0.15s;
+	transition: all 0.2s;
 
-	&:hover { opacity: 0.9; }
+	&:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
 }
 
-/* 上传弹窗 */
+/* Grid */
+.resume-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	gap: 20px;
+}
+
+/* Card base */
+.resume-card {
+	border: 1px solid var(--border-color);
+	border-radius: var(--radius-md);
+	overflow: hidden;
+	background: var(--bg-card);
+	aspect-ratio: 210 / 297;
+	display: flex;
+	flex-direction: column;
+	transition: all 0.25s ease;
+	cursor: pointer;
+
+	&:hover {
+		border-color: rgba(37, 99, 235, 0.4);
+		box-shadow: var(--shadow-lg);
+		transform: translateY(-3px);
+	}
+}
+
+/* Create card */
+.card-new {
+	border-style: dashed;
+	border-color: #d1d5db;
+
+	&:hover { border-color: #93c5fd; background: #eff6ff; }
+}
+
+.card-new-inner {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	flex: 1;
+	gap: 10px;
+	padding: 20px;
+	text-align: center;
+}
+
+.plus-circle {
+	width: 52px;
+	height: 52px;
+	border-radius: 50%;
+	background: #f3f4f6;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.2s ease;
+
+	.card-new:hover & { background: #dbeafe; }
+}
+
+.plus-icon { font-size: 22px; color: #6b7280; transition: color 0.2s; .card-new:hover & { color: #2563eb; } }
+.card-new-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.card-new-desc { font-size: 12px; color: var(--text-muted); }
+
+/* Preview area */
+.card-preview {
+	flex: 1;
+	position: relative;
+	overflow: hidden;
+	background: #f9fafb;
+}
+
+.preview-scaler { pointer-events: none; }
+.preview-inner { pointer-events: none; }
+
+/* Gradient fade */
+.card-fade {
+	position: absolute;
+	left: 0; right: 0; bottom: 0;
+	height: 55%;
+	background: linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.8) 40%, transparent 100%);
+	pointer-events: none;
+}
+
+/* Title overlay */
+.card-overlay {
+	position: absolute;
+	left: 0; right: 0; bottom: 0;
+	padding: 8px 10px 10px;
+	z-index: 2;
+}
+
+.card-resume-title {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--text-primary);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.card-meta {
+	display: block;
+	font-size: 11px;
+	color: var(--text-secondary);
+	margin-top: 2px;
+}
+
+/* Card footer */
+.card-footer {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px;
+	padding: 6px 8px 8px;
+	border-top: 1px solid #f3f4f6;
+	background: var(--bg-card);
+	flex-shrink: 0;
+}
+
+.card-btn {
+	padding: 5px;
+	border: 1px solid var(--border-color);
+	border-radius: var(--radius-sm);
+	background: var(--bg-card);
+	font-size: 12px;
+	color: var(--text-secondary);
+	cursor: pointer;
+	text-align: center;
+	transition: all 0.15s;
+
+	&:hover { background: #f3f4f6; }
+}
+
+.card-btn-danger {
+	color: var(--danger-color);
+
+	&:hover { background: #fef2f2; border-color: #fca5a5; }
+}
+
+/* Delete modal */
+.modal-box {
+	background: var(--bg-card);
+	border-radius: var(--radius-md);
+	padding: 28px 28px 20px;
+	width: 380px;
+	max-width: 90vw;
+	box-shadow: var(--shadow-lg);
+	animation: slideUp 0.25s ease;
+}
+
+.modal-title { display: block; font-size: 17px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; }
+.modal-desc { display: block; font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 20px; }
+
+.modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+}
+
+.btn-danger {
+	padding: 8px 18px;
+	background: var(--danger-color);
+	color: #fff;
+	border: none;
+	border-radius: var(--radius-sm);
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 0.15s;
+
+	&:hover { background: #dc2626; }
+}
+
+/* Upload modal */
 .upload-modal {
 	width: 480px;
 }
@@ -749,7 +701,7 @@ function goToAIOptimize() {
 	padding: 40px 20px;
 	margin: 20px 0;
 	border: 2px dashed #d1d5db;
-	border-radius: 12px;
+	border-radius: var(--radius-md);
 	background: #f9fafb;
 	cursor: pointer;
 	transition: all 0.2s;
@@ -760,21 +712,11 @@ function goToAIOptimize() {
 	}
 }
 
-.upload-icon {
-	font-size: 48px;
-}
+.upload-icon { font-size: 48px; }
+.upload-text { font-size: 14px; color: var(--text-secondary); }
+.upload-hint { font-size: 12px; color: var(--text-muted); }
 
-.upload-text {
-	font-size: 14px;
-	color: #374151;
-}
-
-.upload-hint {
-	font-size: 12px;
-	color: #9ca3af;
-}
-
-/* 模板广场弹窗 */
+/* Gallery modal */
 .gallery-modal {
 	width: 90vw;
 	max-width: 1000px;

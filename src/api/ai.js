@@ -64,11 +64,15 @@ function aiRequest(options) {
 /**
  * 文件上传专用请求（multipart/form-data）
  */
-function uploadFile(url, fileOrBlob, filename = 'resume.txt') {
+function uploadFile(url, fileOrBlob, filename = 'resume.txt', sessionId = null) {
 	const formData = new FormData()
 	formData.append('file', fileOrBlob, filename)
 
-	const fullUrl = url.startsWith('http') ? url : `${getAIBaseUrl()}${url}`
+	let fullUrl = url.startsWith('http') ? url : `${getAIBaseUrl()}${url}`
+	if (sessionId) {
+		const sep = fullUrl.includes('?') ? '&' : '?'
+		fullUrl += `${sep}session_id=${encodeURIComponent(sessionId)}`
+	}
 
 	return fetch(fullUrl, {
 		method: 'POST',
@@ -148,14 +152,14 @@ export function deleteSession(sessionId) {
 // ==================== 文件接口 ====================
 
 /** 上传简历文件 */
-export function uploadResumeFile(file) {
-	return uploadFile('/upload/resume', file, file.name)
+export function uploadResumeFile(file, sessionId = null) {
+	return uploadFile('/upload/resume', file, file.name, sessionId)
 }
 
 /** 上传简历文本（粘贴内容转换为 txt 文件） */
-export function uploadResumeText(text) {
+export function uploadResumeText(text, sessionId = null) {
 	const blob = new Blob([text], { type: 'text/plain' })
-	return uploadFile('/upload/resume', blob, 'resume.txt')
+	return uploadFile('/upload/resume', blob, 'resume.txt', sessionId)
 }
 
 // ==================== 简历接口 ====================
@@ -168,51 +172,73 @@ export function fetchEditorFormat(sessionId) {
 	})
 }
 
+// ==================== JD 接口 ====================
+
+/** 独立解析 JD 原文（不依赖简历与向量库） */
+export function parseJD(jdText) {
+	return aiRequest({
+		url: '/jd/parse',
+		method: 'POST',
+		data: { jd_text: jdText },
+	})
+}
+
 // ==================== Agent 接口 ====================
 
 /** 运行单个 Agent */
-export function runAgent(agentKey, extra = {}) {
+export function runAgent(agentKey, extra = {}, sessionId = null) {
+	const data = { extra }
+	if (sessionId) data.session_id = sessionId
 	return aiRequest({
 		url: `/agents/${agentKey}/run`,
 		method: 'POST',
-		data: { extra },
+		data,
 	})
 }
 
 /** 运行完整流水线 */
-export function runPipeline(fromAgent = null, extra = {}) {
+export function runPipeline(fromAgent = null, extra = {}, sessionId = null) {
+	const data = { from_agent: fromAgent, extra }
+	if (sessionId) data.session_id = sessionId
 	return aiRequest({
 		url: '/pipeline/run',
 		method: 'POST',
-		data: { from_agent: fromAgent, extra },
+		data,
 	})
 }
 
 // ==================== 职业引导接口 ====================
 
 /** 开始职业引导测试，返回第一题 */
-export function startCoaching() {
+export function startCoaching(sessionId = null) {
+	const data = {}
+	if (sessionId) data.session_id = sessionId
 	return aiRequest({
 		url: '/coaching/start',
 		method: 'POST',
+		data,
 	})
 }
 
 /** 提交一题答案，返回下一题或完成提示 */
-export function answerCoaching(questionId, answer) {
+export function answerCoaching(questionId, answer, sessionId = null) {
+	const data = { question_id: questionId, answer }
+	if (sessionId) data.session_id = sessionId
 	return aiRequest({
 		url: '/coaching/answer',
 		method: 'POST',
-		data: { question_id: questionId, answer },
+		data,
 	})
 }
 
 /** 完成测试，计算结果并生成职业意向 */
-export function finishCoaching() {
+export function finishCoaching(sessionId = null) {
+	const data = {}
+	if (sessionId) data.session_id = sessionId
 	return aiRequest({
 		url: '/coaching/finish',
 		method: 'POST',
-		data: {},
+		data,
 	})
 }
 

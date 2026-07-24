@@ -108,7 +108,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 
 		try {
 			// 1. 上传文件
-			const uploadRes = await uploadResumeFile(file)
+			const uploadRes = await uploadResumeFile(file, sessionId.value)
 			if (!uploadRes.ok) {
 				error.value = uploadRes.message || '上传失败'
 				return { success: false, message: error.value }
@@ -116,7 +116,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 
 			// 2. 调用解析 Agent（传入上传的文件路径）
 			const filePath = uploadRes.data?.file_path
-			const parseRes = await runAgent('resume_parser', filePath ? { resume_file_path: filePath } : {})
+			const parseRes = await runAgent('resume_parser', filePath ? { resume_file_path: filePath } : {}, sessionId.value)
 			if (!parseRes.ok) {
 				error.value = parseRes.message || '解析失败'
 				return { success: false, message: error.value }
@@ -177,14 +177,14 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 
 		try {
 			// 1. 上传文本
-			const uploadRes = await uploadResumeText(text)
+			const uploadRes = await uploadResumeText(text, sessionId.value)
 			if (!uploadRes.ok) {
 				error.value = uploadRes.message || '上传失败'
 				return { success: false, message: error.value }
 			}
 
 			// 2. 调用解析 Agent（传入原文文本）
-			const parseRes = await runAgent('resume_parser', { raw_resume_text: text })
+			const parseRes = await runAgent('resume_parser', { raw_resume_text: text }, sessionId.value)
 			if (!parseRes.ok) {
 				error.value = parseRes.message || '解析失败'
 				return { success: false, message: error.value }
@@ -235,7 +235,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 		error.value = ''
 
 		try {
-			const res = await runAgent(agentKey, extra)
+			const res = await runAgent(agentKey, extra, sessionId.value)
 			if (!res.ok) {
 				error.value = res.message || `${agentKey} 运行失败`
 				return { success: false, message: error.value }
@@ -253,12 +253,83 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 		}
 	}
 
+	function _buildProfileQuery(formData) {
+		const parts = []
+		if (formData.targetRole) parts.push(`目标岗位：${formData.targetRole}`)
+		if (formData.experienceYear) parts.push(`工作年限：${formData.experienceYear}`)
+		if (formData.targetCities?.length) parts.push(`目标城市：${formData.targetCities.join('、')}`)
+		if (formData.coreSkills?.length) parts.push(`核心技能：${formData.coreSkills.join('、')}`)
+		if (formData.extraInfo) parts.push(`补充说明：${formData.extraInfo}`)
+		return parts.join('\n')
+	}
+
+	function _transformJD(backendJD) {
+		if (!backendJD) return null
+		const skills = Array.isArray(backendJD.skills) ? backendJD.skills : []
+		return {
+			job_title: backendJD.job_title || '',
+			company: backendJD.company || '',
+			hard_skills: skills.map((s) => (typeof s === 'string' ? { name: s } : s)),
+			soft_skills: [],
+			experience: '',
+			education: '',
+			keywords: skills,
+			description: backendJD.description || '',
+			location: backendJD.location || '',
+			salary_range: backendJD.salary_range || '',
+		}
+	}
+
+	function _transformDiagnosis(backendDiagnosis) {
+		if (!backendDiagnosis) return null
+		const moduleDiagnoses = backendDiagnosis.module_diagnoses || []
+		const weakPoints = moduleDiagnoses.map((d) => ({
+			module: d.module,
+			name: d.module_label || d.module,
+			description: d.problems_found?.join('；') || d.recommended_direction || '',
+			evidence: d.evidence_excerpt || '',
+			suggestion: d.recommended_direction || '',
+			priority: d.severity || 'medium',
+		}))
+		const priorityQueue = (backendDiagnosis.priority_fix_order || []).map((m) => ({
+			module: m,
+			name: moduleDiagnoses.find((d) => d.module === m)?.module_label || m,
+		}))
+		const highCount = weakPoints.filter((w) => w.priority === 'high').length
+		const matchScore = Math.max(0, Math.min(100, Math.round(85 - highCount * 10 - weakPoints.length * 2)))
+		return {
+			match_score: matchScore,
+			matched: (backendDiagnosis.strengths_in_original || []).map((s) => ({ name: s })),
+			gaps: weakPoints.filter((w) => w.priority === 'high'),
+			weak_points: weakPoints,
+			priority_queue: priorityQueue,
+			executive_summary: backendDiagnosis.executive_summary || '',
+			target_role_focus: backendDiagnosis.target_role_focus || '',
+			diagnosis_markdown: backendDiagnosis.diagnosis_markdown || '',
+		}
+	}
+
+	function _transformModuleRewrites(backendRewrites) {
+		if (!backendRewrites?.rewrites) return {}
+		const result = {}
+		for (const r of backendRewrites.rewrites) {
+			result[r.module] = {
+				optimized_html: r.rewritten ? `<p>${r.rewritten}</p>` : '',
+				change_summary: r.change_summary ? [r.change_summary] : [],
+				keywords_added: r.keywords_added || [],
+				original: r.original || '',
+			}
+		}
+		return result
+	}
+
 	async function submitProfile(formData) {
 		loading.value = true
 		loadingAgent.value = 'career_profiler'
 		error.value = ''
 		try {
-			const res = await runAgent('career_profiler', { profile: formData })
+			const userQuery = _buildProfileQuery(formData)
+			const res = await runAgent('career_profiler', { user_query: userQuery }, sessionId.value)
 			if (!res.ok) {
 				error.value = res.message || '提交求职画像失败'
 				return { success: false, message: error.value }
@@ -267,7 +338,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 				sessionId.value = res.data.session_id
 			}
 			profileData.value = formData
-			careerProfile.value = res.data?.career_profile || res.data
+			careerProfile.value = res.data?.result?.career_intent || res.data?.career_intent || res.data
 			return { success: true, data: careerProfile.value }
 		} catch (e) {
 			error.value = '提交求职画像失败'
@@ -279,9 +350,9 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 	}
 
 	async function runJDAgent(jdInput) {
-		const res = await runAgentByKey('jd_matcher', { jd_text: jdInput })
+		const res = await runAgentByKey('jd_matcher', { target_jd_text: jdInput })
 		if (res.success && res.data) {
-			jdStructured.value = res.data.jd_structured || res.data
+			jdStructured.value = _transformJD(res.data?.result?.target_jd || res.data?.target_jd) || res.data
 			jdText.value = jdInput
 		}
 		return res
@@ -298,7 +369,9 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			chainProgress.value = ''
 			return diagRes
 		}
-		diagnosisReport.value = diagRes.data?.diagnosis_report || diagRes.data
+		diagnosisReport.value = _transformDiagnosis(
+			diagRes.data?.result?.resume_diagnosis || diagRes.data?.resume_diagnosis
+		)
 
 		chainProgress.value = '制定优化策略…'
 		const stratRes = await runAgentByKey('strategy_planner')
@@ -307,13 +380,16 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			chainProgress.value = ''
 			return stratRes
 		}
-		optimizationPlan.value = stratRes.data?.optimization_plan || stratRes.data
+		optimizationPlan.value = stratRes.data?.result?.optimization_plan || stratRes.data?.optimization_plan
 
 		if (moduleIds.length > 0) {
 			chainProgress.value = '预计算模块优化…'
-			const modRes = await runAgent('module_optimizer', { modules: moduleIds })
-			if (modRes.ok && modRes.data?.modules) {
-				for (const [key, val] of Object.entries(modRes.data.modules)) {
+			const modRes = await runAgent('module_optimizer', { modules: moduleIds }, sessionId.value)
+			if (modRes.ok) {
+				const transformed = _transformModuleRewrites(
+					modRes.data?.result?.module_rewrites || modRes.data?.module_rewrites
+				)
+				for (const [key, val] of Object.entries(transformed)) {
 					moduleResults.value[key] = val
 				}
 			}
@@ -330,11 +406,16 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			return { success: true, data: moduleResults.value[moduleId] }
 		}
 		const res = await runAgentByKey('module_optimizer', {
-			module: moduleId,
+			modules: [moduleId],
 			style,
 		})
 		if (res.success && res.data) {
-			moduleResults.value[moduleId] = res.data
+			const transformed = _transformModuleRewrites(
+				res.data?.result?.module_rewrites || res.data?.module_rewrites
+			)
+			if (transformed[moduleId]) {
+				moduleResults.value[moduleId] = transformed[moduleId]
+			}
 		}
 		return res
 	}
@@ -379,7 +460,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 				extra.module_refine_feedback = options.moduleRefineFeedback
 			}
 
-			const res = await runAgent('module_optimizer', extra)
+			const res = await runAgent('module_optimizer', extra, sessionId.value)
 			if (!res.ok) {
 				error.value = res.message || '模块优化失败'
 				return { success: false, message: error.value }
@@ -389,13 +470,20 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			}
 
 			// 解析返回结果
-			const resultData = res.data
-			console.log('[AI] 模块优化结果:', resultData)
+			const transformed = _transformModuleRewrites(
+				res.data?.result?.module_rewrites || res.data?.module_rewrites
+			)
+			console.log('[AI] 模块优化结果:', transformed)
+
+			if (moduleKey && transformed[moduleKey]) {
+				moduleResults.value[moduleKey] = transformed[moduleKey]
+			}
 
 			// 返回优化后的内容
+			const data = moduleKey ? transformed[moduleKey] : transformed
 			return { 
 				success: true, 
-				data: resultData?.optimized_content || resultData?.content || resultData 
+				data: data || res.data 
 			}
 		} catch (e) {
 			console.error('[AI] 模块优化失败:', e)
@@ -421,12 +509,12 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 		error.value = ''
 
 		try {
-			const uploadRes = await uploadResumeText(resumeText)
+			const uploadRes = await uploadResumeText(resumeText, sessionId.value)
 			if (!uploadRes.ok) {
 				error.value = '上传简历失败'
 				return { success: false, message: error.value }
 			}
-			const parseRes = await runAgent('resume_parser', { raw_resume_text: resumeText })
+			const parseRes = await runAgent('resume_parser', { raw_resume_text: resumeText }, sessionId.value)
 			if (!parseRes.ok) {
 				error.value = parseRes.message || '解析失败'
 				return { success: false, message: error.value }
@@ -465,7 +553,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			// 1. 上传简历文本 + 解析（除非已预解析）
 			if (!skipParse) {
 				chainProgress.value = '解析简历…'
-				const parseRes = await runAgent('resume_parser')
+				const parseRes = await runAgent('resume_parser', {}, sessionId.value)
 				if (!parseRes.ok) {
 					error.value = parseRes.message || '解析失败'
 					return { success: false, message: error.value }
@@ -473,7 +561,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			}
 			if (prompt) {
 				chainProgress.value = '分析求职方向…'
-				const profRes = await runAgent('career_profiler', { profile: { prompt } })
+				const profRes = await runAgent('career_profiler', { user_query: prompt }, sessionId.value)
 				if (!profRes.ok) {
 					error.value = profRes.message || '求职方向分析失败'
 					return { success: false, message: error.value }
@@ -484,17 +572,19 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			// 3. 解析 JD
 			if (jdText) {
 				chainProgress.value = '解析目标岗位…'
-				const jdRes = await runAgent('jd_matcher', { jd_text: jdText })
+				const jdRes = await runAgent('jd_matcher', { target_jd_text: jdText }, sessionId.value)
 				if (!jdRes.ok) {
 					error.value = jdRes.message || 'JD 解析失败'
 					return { success: false, message: error.value }
 				}
-				jdStructured.value = jdRes.data?.jd_structured || jdRes.data
+				jdStructured.value = _transformJD(
+					jdRes.data?.result?.target_jd || jdRes.data?.target_jd
+				) || jdRes.data
 			}
 
 			// 4. 诊断
 			chainProgress.value = '诊断简历问题…'
-			const diagRes = await runAgent('resume_diagnostician')
+			const diagRes = await runAgent('resume_diagnostician', {}, sessionId.value)
 			if (!diagRes.ok) {
 				error.value = diagRes.message || '诊断失败'
 				return { success: false, message: error.value }
@@ -503,7 +593,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 
 			// 5. 策略规划
 			chainProgress.value = '制定优化策略…'
-			const stratRes = await runAgent('strategy_planner')
+			const stratRes = await runAgent('strategy_planner', {}, sessionId.value)
 			if (!stratRes.ok) {
 				error.value = stratRes.message || '策略规划失败'
 				return { success: false, message: error.value }
@@ -513,9 +603,12 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			// 6. 模块预优化
 			if (moduleIds && moduleIds.length > 0) {
 				chainProgress.value = '预计算模块优化…'
-				const modRes = await runAgent('module_optimizer', { modules: moduleIds })
-				if (modRes.ok && modRes.data?.modules) {
-					for (const [key, val] of Object.entries(modRes.data.modules)) {
+				const modRes = await runAgent('module_optimizer', { modules: moduleIds }, sessionId.value)
+				if (modRes.ok) {
+					const transformed = _transformModuleRewrites(
+						modRes.data?.result?.module_rewrites || modRes.data?.module_rewrites
+					)
+					for (const [key, val] of Object.entries(transformed)) {
 						moduleResults.value[key] = val
 					}
 				}
@@ -536,7 +629,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 	async function runFactChecker() {
 		const res = await runAgentByKey('fact_checker')
 		if (res.success && res.data) {
-			factCheckResult.value = res.data
+			factCheckResult.value = res.data?.result || res.data
 		}
 		return res
 	}
@@ -549,7 +642,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 		loading.value = true
 		error.value = ''
 		try {
-			const res = await startCoaching()
+			const res = await startCoaching(sessionId.value)
 			if (!res.ok) {
 				error.value = res.message || '开始职业引导失败'
 				return { success: false, message: error.value }
@@ -572,7 +665,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 		loading.value = true
 		error.value = ''
 		try {
-			const res = await answerCoaching(questionId, answer)
+			const res = await answerCoaching(questionId, answer, sessionId.value)
 			if (!res.ok) {
 				error.value = res.message || '提交答案失败'
 				return { success: false, message: error.value }
@@ -595,7 +688,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 		loading.value = true
 		error.value = ''
 		try {
-			const res = await finishCoaching()
+			const res = await finishCoaching(sessionId.value)
 			if (!res.ok) {
 				error.value = res.message || '完成职业引导失败'
 				return { success: false, message: error.value }
@@ -629,10 +722,16 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 		const res = await getSession(sessionId.value)
 		if (res.ok && res.data) {
 			const state = res.data.state || res.data
-			if (state.career_profile) careerProfile.value = state.career_profile
-			if (state.jd_structured) jdStructured.value = state.jd_structured
-			if (state.diagnosis_report) diagnosisReport.value = state.diagnosis_report
+			if (state.career_intent) careerProfile.value = state.career_intent
+			if (state.target_jd) jdStructured.value = _transformJD(state.target_jd)
+			if (state.resume_diagnosis) diagnosisReport.value = _transformDiagnosis(state.resume_diagnosis)
 			if (state.optimization_plan) optimizationPlan.value = state.optimization_plan
+			if (state.module_rewrites) {
+				const transformed = _transformModuleRewrites(state.module_rewrites)
+				for (const [key, val] of Object.entries(transformed)) {
+					moduleResults.value[key] = val
+				}
+			}
 			return { success: true, state }
 		}
 		return { success: false }

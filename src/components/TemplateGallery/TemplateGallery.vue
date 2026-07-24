@@ -7,43 +7,18 @@
 
 		<view class="gallery-filters">
 			<view
+				v-for="cat in categories"
+				:key="cat.value"
 				class="filter-tag"
-				:class="{ active: selectedCategory === '' }"
-				@click="selectedCategory = ''"
+				:class="{ active: selectedCategory === cat.value }"
+				@click="selectedCategory = cat.value"
 			>
-				<text>全部</text>
-			</view>
-			<view
-				class="filter-tag"
-				:class="{ active: selectedCategory === 'tech' }"
-				@click="selectedCategory = 'tech'"
-			>
-				<text>技术</text>
-			</view>
-			<view
-				class="filter-tag"
-				:class="{ active: selectedCategory === 'design' }"
-				@click="selectedCategory = 'design'"
-			>
-				<text>设计</text>
-			</view>
-			<view
-				class="filter-tag"
-				:class="{ active: selectedCategory === 'business' }"
-				@click="selectedCategory = 'business'"
-			>
-				<text>商务</text>
-			</view>
-			<view
-				class="filter-tag"
-				:class="{ active: selectedCategory === 'custom' }"
-				@click="selectedCategory = 'custom'"
-			>
-				<text>自定义</text>
+				<text>{{ cat.label }}</text>
 			</view>
 		</view>
 
 		<view v-if="loading" class="gallery-loading">
+			<view class="loading-spinner"></view>
 			<text>加载中...</text>
 		</view>
 
@@ -63,12 +38,18 @@
 					<view class="preview-placeholder">
 						<text class="preview-icon">📄</text>
 					</view>
+					<view class="card-overlay">
+						<text class="use-btn">使用模板</text>
+					</view>
 				</view>
 				<view class="card-info">
 					<text class="card-title">{{ template.name }}</text>
 					<text class="card-author">by {{ template.author }}</text>
 					<view class="card-meta">
-						<text class="meta-usage">{{ template.usageCount }} 次使用</text>
+						<text class="meta-usage">
+							<text class="usage-icon">👁</text>
+							{{ template.usageCount }} 次使用
+						</text>
 						<text class="meta-category">{{ getCategoryLabel(template.category) }}</text>
 					</view>
 				</view>
@@ -87,6 +68,14 @@ const resumeStore = useResumeStore()
 
 const loading = ref(false)
 const selectedCategory = ref('')
+
+const categories = [
+	{ value: '', label: '全部' },
+	{ value: 'tech', label: '技术' },
+	{ value: 'design', label: '设计' },
+	{ value: 'business', label: '商务' },
+	{ value: 'custom', label: '自定义' },
+]
 
 const filteredTemplates = computed(() => {
 	if (!selectedCategory.value) return templateStore.templates
@@ -127,8 +116,6 @@ async function handleUseTemplate(template) {
 </script>
 
 <style scoped lang="scss">
-$primary: #2563eb;
-
 .template-gallery {
 	padding: 24px;
 }
@@ -141,14 +128,14 @@ $primary: #2563eb;
 	display: block;
 	font-size: 20px;
 	font-weight: 600;
-	color: #111827;
+	color: var(--text-primary);
 	margin-bottom: 4px;
 }
 
 .gallery-desc {
 	display: block;
 	font-size: 14px;
-	color: #6b7280;
+	color: var(--text-secondary);
 }
 
 .gallery-filters {
@@ -160,22 +147,25 @@ $primary: #2563eb;
 
 .filter-tag {
 	padding: 6px 16px;
-	border: 1px solid #e5e7eb;
+	border: 1px solid var(--border-color);
 	border-radius: 20px;
 	font-size: 13px;
-	color: #6b7280;
+	color: var(--text-secondary);
 	cursor: pointer;
-	transition: all 0.2s;
+	transition: all var(--transition-fast);
+	background: var(--bg-card);
 
 	&:hover {
-		border-color: $primary;
-		color: $primary;
+		border-color: var(--primary-light);
+		color: var(--primary-light);
+		transform: translateY(-1px);
 	}
 
 	&.active {
-		background: $primary;
-		border-color: $primary;
+		background: var(--primary-light);
+		border-color: var(--primary-light);
 		color: #fff;
+		box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
 	}
 }
 
@@ -187,15 +177,35 @@ $primary: #2563eb;
 	justify-content: center;
 	padding: 60px 20px;
 	gap: 12px;
+	color: var(--text-secondary);
+}
+
+.loading-spinner {
+	width: 32px;
+	height: 32px;
+	border: 2px solid var(--border-color);
+	border-top-color: var(--primary-light);
+	border-radius: 50%;
+	animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+	to { transform: rotate(360deg); }
 }
 
 .empty-icon {
 	font-size: 48px;
+	animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+	0%, 100% { transform: translateY(0); }
+	50% { transform: translateY(-5px); }
 }
 
 .empty-text {
 	font-size: 14px;
-	color: #6b7280;
+	color: var(--text-secondary);
 }
 
 .template-grid {
@@ -205,26 +215,36 @@ $primary: #2563eb;
 }
 
 .template-card {
-	border: 1px solid #e5e7eb;
-	border-radius: 12px;
+	border: 1px solid var(--border-color);
+	border-radius: var(--radius-md);
 	overflow: hidden;
-	background: #fff;
+	background: var(--bg-card);
 	cursor: pointer;
-	transition: all 0.2s;
+	transition: all var(--transition-normal);
 
 	&:hover {
-		border-color: $primary;
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
-		transform: translateY(-2px);
+		border-color: rgba(37, 99, 235, 0.3);
+		box-shadow: var(--shadow-lg);
+		transform: translateY(-4px);
+		
+		.card-overlay {
+			opacity: 1;
+		}
+		
+		.preview-icon {
+			transform: scale(1.1);
+		}
 	}
 }
 
 .card-preview {
 	height: 180px;
-	background: #f9fafb;
+	background: var(--bg-page);
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	position: relative;
+	overflow: hidden;
 }
 
 .preview-placeholder {
@@ -235,6 +255,33 @@ $primary: #2563eb;
 
 .preview-icon {
 	font-size: 64px;
+	transition: transform var(--transition-normal);
+}
+
+.card-overlay {
+	position: absolute;
+	inset: 0;
+	background: rgba(30, 58, 138, 0.8);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity var(--transition-fast);
+}
+
+.use-btn {
+	padding: 8px 20px;
+	background: #fff;
+	color: var(--primary-color);
+	border-radius: 20px;
+	font-size: 13px;
+	font-weight: 500;
+	transform: translateY(10px);
+	transition: all var(--transition-fast);
+	
+	.template-card:hover & {
+		transform: translateY(0);
+	}
 }
 
 .card-info {
@@ -245,7 +292,7 @@ $primary: #2563eb;
 	display: block;
 	font-size: 15px;
 	font-weight: 600;
-	color: #111827;
+	color: var(--text-primary);
 	margin-bottom: 4px;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -255,7 +302,7 @@ $primary: #2563eb;
 .card-author {
 	display: block;
 	font-size: 12px;
-	color: #6b7280;
+	color: var(--text-secondary);
 	margin-bottom: 8px;
 }
 
@@ -267,14 +314,22 @@ $primary: #2563eb;
 
 .meta-usage {
 	font-size: 12px;
-	color: #6b7280;
+	color: var(--text-secondary);
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	
+	.usage-icon {
+		font-size: 10px;
+	}
 }
 
 .meta-category {
 	font-size: 11px;
 	padding: 2px 8px;
-	background: #eff6ff;
-	color: $primary;
+	background: rgba(37, 99, 235, 0.1);
+	color: var(--primary-light);
 	border-radius: 4px;
+	font-weight: 500;
 }
 </style>

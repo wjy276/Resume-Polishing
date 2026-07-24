@@ -1,6 +1,9 @@
 <template>
 	<div class="edit-panel">
-		<div v-if="!activeResume" class="empty-state">请先选择简历</div>
+		<div v-if="!activeResume" class="empty-state">
+			<div class="empty-icon">📝</div>
+			<div class="empty-text">请先选择简历</div>
+		</div>
 
 		<template v-else>
 			<!-- 当前模块标题 -->
@@ -80,16 +83,46 @@ function renameSection(title) {
 .edit-panel {
 	height: 100%;
 	overflow-y: auto;
-	background: #fff;
+	background: var(--bg-card);
+	
+	&::-webkit-scrollbar {
+		width: 5px;
+	}
+	&::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	&::-webkit-scrollbar-thumb {
+		background: var(--border-color);
+		border-radius: 10px;
+	}
+	&::-webkit-scrollbar-thumb:hover {
+		background: var(--text-muted);
+	}
 }
 
 .empty-state {
 	display: flex;
+	flex-direction: column;
 	align-items: center;
 	justify-content: center;
 	height: 100%;
-	color: #9ca3af;
-	font-size: 14px;
+	color: var(--text-muted);
+	gap: 12px;
+	
+	.empty-icon {
+		font-size: 48px;
+		opacity: 0.5;
+		animation: pulse 2s ease-in-out infinite;
+	}
+	
+	.empty-text {
+		font-size: 14px;
+	}
+}
+
+@keyframes pulse {
+	0%, 100% { opacity: 0.5; transform: scale(1); }
+	50% { opacity: 0.8; transform: scale(1.05); }
 }
 
 .panel-section-header {
@@ -97,21 +130,34 @@ function renameSection(title) {
 	align-items: center;
 	gap: 8px;
 	padding: 16px 16px 12px;
-	border-bottom: 1px solid #f3f4f6;
-	background: #fff;
+	border-bottom: 1px solid var(--bg-page);
+	background: var(--bg-card);
 	position: sticky;
 	top: 0;
 	z-index: 5;
+	transition: all var(--transition-fast);
+	
+	&:hover {
+		background: linear-gradient(to bottom, var(--bg-card), var(--bg-page));
+	}
 }
 
-.section-icon { font-size: 16px; }
+.section-icon { 
+	font-size: 16px;
+	transition: transform 0.2s ease;
+	
+	&:hover {
+		transform: scale(1.2);
+	}
+}
 
 .section-name {
 	font-size: 16px;
 	font-weight: 600;
-	color: #111827;
+	color: var(--text-primary);
+	transition: color var(--transition-fast);
 
-	&.primary { color: #2563eb; }
+	&.primary { color: var(--primary-light); }
 }
 
 .section-name-input {
@@ -121,17 +167,22 @@ function renameSection(title) {
 	font-size: 16px;
 	font-weight: 600;
 	line-height: 1.45;
-	color: #2563eb;
+	color: var(--primary-light);
 	border: 1px solid transparent;
-	border-radius: 8px;
+	border-radius: var(--radius-sm);
 	outline: none;
 	background: transparent;
 	box-sizing: border-box;
-	transition: border-color 0.15s, background 0.15s;
+	transition: all var(--transition-fast);
 
 	&:focus {
-		border-color: #bfdbfe;
-		background: #f8fafc;
+		border-color: rgba(59, 130, 246, 0.3);
+		background: var(--bg-page);
+		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+	}
+	
+	&:hover:not(:focus) {
+		background: var(--bg-page);
 	}
 }
 </style>

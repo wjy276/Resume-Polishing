@@ -1,6 +1,6 @@
 <template>
 	<div class="rich-editor" :class="{ focused }">
-		<!-- 工具栏：两行布局，与参考 UI 一致 -->
+		<!-- 工具栏 -->
 		<div class="toolbar">
 			<div class="toolbar-row">
 				<button
@@ -126,7 +126,6 @@ import { TextStyle } from '@tiptap/extension-text-style'
 const props = defineProps({
 	modelValue: { type: String, default: '' },
 	placeholder: { type: String, default: '请输入内容...' },
-	/** 编辑区最小高度（px），大段职责/项目描述建议 168+ */
 	minHeight: { type: Number, default: 168 },
 })
 
@@ -190,54 +189,55 @@ onBeforeUnmount(() => {
 
 <style scoped lang="scss">
 .rich-editor {
-	border: 1px solid #e5e7eb;
-	border-radius: 8px;
-	background: #fff;
-	transition: border-color 0.15s, box-shadow 0.15s;
+	border: 1px solid var(--border-color);
+	border-radius: var(--radius-md);
+	background: var(--bg-card);
+	transition: all var(--transition-fast);
+	overflow: hidden;
 
 	&.focused {
-		border-color: #93c5fd;
-		box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.2);
+		border-color: var(--primary-light);
+		box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 	}
 }
 
 .toolbar {
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
-	padding: 6px 8px;
-	border-bottom: 1px solid #f3f4f6;
-	background: #fafafa;
-	border-radius: 8px 8px 0 0;
+	gap: 4px;
+	padding: 10px 12px;
+	border-bottom: 1px solid var(--bg-page);
+	background: var(--bg-page);
 }
 
 .toolbar-row {
 	display: flex;
 	align-items: center;
 	flex-wrap: wrap;
-	gap: 2px;
+	gap: 4px;
 }
 
 .tb-btn {
-	width: 28px;
-	height: 28px;
+	width: 32px;
+	height: 32px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	border: none;
 	background: transparent;
-	border-radius: 6px;
+	border-radius: var(--radius-sm);
 	cursor: pointer;
-	transition: background 0.1s, color 0.1s;
+	transition: all var(--transition-fast);
 	flex-shrink: 0;
 	padding: 0;
 
 	&:hover {
-		background: #f3f4f6;
+		background: var(--bg-card);
+		transform: translateY(-1px);
 	}
 
 	&.active {
-		background: #eff6ff;
+		background: rgba(37, 99, 235, 0.1);
 	}
 }
 
@@ -246,7 +246,8 @@ onBeforeUnmount(() => {
 	height: 16px;
 	display: block;
 	pointer-events: none;
-	opacity: 0.72;
+	opacity: 0.7;
+	transition: opacity var(--transition-fast);
 }
 
 .tb-btn:hover .tb-icon,
@@ -260,9 +261,9 @@ onBeforeUnmount(() => {
 
 .tb-sep {
 	width: 1px;
-	height: 18px;
-	background: #e5e7eb;
-	margin: 0 4px;
+	height: 20px;
+	background: var(--border-color);
+	margin: 0 6px;
 	flex-shrink: 0;
 }
 
@@ -271,44 +272,41 @@ onBeforeUnmount(() => {
 	:deep(.ProseMirror),
 	:deep(.prose-area) {
 		min-height: v-bind(editorMinHeight);
-		padding: 12px 14px;
-		font-size: 13px;
+		padding: 14px 16px;
+		font-size: 14px;
 		line-height: 1.75;
-		color: #111827;
+		color: var(--text-primary);
 		outline: none;
 		box-sizing: border-box;
 
 		ul {
 			padding-left: 1.5em;
-			margin: 6px 0;
+			margin: 8px 0;
 
 			li {
 				margin-bottom: 6px;
-
 				p { margin: 0; }
 			}
 		}
 
 		ol {
 			padding-left: 1.5em;
-			margin: 6px 0;
+			margin: 8px 0;
 
 			li {
 				margin-bottom: 6px;
-
 				p { margin: 0; }
 			}
 		}
 
 		p {
-			margin: 0 0 6px 0;
-
+			margin: 0 0 8px 0;
 			&:last-child { margin-bottom: 0; }
 		}
 
 		p.is-editor-empty:first-child::before {
 			content: attr(data-placeholder);
-			color: #9ca3af;
+			color: var(--text-muted);
 			pointer-events: none;
 			float: left;
 			height: 0;
