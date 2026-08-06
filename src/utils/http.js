@@ -31,6 +31,7 @@ function handleTokenExpired() {
  * @param {object} [options.data] body
  * @param {object} [options.query] query 参数
  * @param {boolean} [options.auth=true] 是否携带 Bearer Token
+ * @param {number} [options.timeout] 请求超时（毫秒），默认 30000
  */
 export function request(options) {
 	const {
@@ -39,6 +40,7 @@ export function request(options) {
 		data,
 		query,
 		auth = true,
+		timeout: customTimeout,
 	} = options
 
 	let fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`
@@ -65,7 +67,7 @@ export function request(options) {
 			method,
 			data,
 			header,
-			timeout: 30000,
+			timeout: customTimeout || 30000,
 			success: (res) => {
 				if (res.statusCode === 401) {
 					handleTokenExpired()
@@ -89,6 +91,8 @@ export function request(options) {
 					message: body?.message || (ok ? '' : `HTTP ${res.statusCode}`),
 					data: body?.data,
 					raw: body,
+					statusCode: res.statusCode,
+					headers: res.header,
 				})
 			},
 			fail: () => {

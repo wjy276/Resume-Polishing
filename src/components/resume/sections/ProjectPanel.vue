@@ -1,6 +1,11 @@
 <template>
 	<div class="section-panel">
-		<div v-for="(proj, idx) in list" :key="proj.id" class="item-card">
+		<div
+			v-for="(proj, idx) in list"
+			:key="proj.id"
+			class="item-card"
+			v-memo="[proj.id, proj.name, proj.role, proj.date, proj.link, proj.description, expanded === proj.id, idx, list.length]"
+		>
 			<div class="item-card-header" @click="toggle(proj.id)">
 				<span class="item-card-title">{{ proj.name || '新项目经历' }}</span>
 				<div class="item-card-actions">

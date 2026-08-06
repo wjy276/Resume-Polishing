@@ -21,21 +21,23 @@ export function fetchResumeDetail(resumeId) {
 	})
 }
 
-/** 创建简历 */
+/** 创建简历（大 payload 时给 60s，避免头像/富文本导致上传超时） */
 export function createResumeApi(payload) {
 	return request({
 		url: '/v1/resume-data',
 		method: 'POST',
 		data: payload,
+		timeout: 60000,
 	})
 }
 
-/** 更新简历 */
+/** 更新简历（大 payload 时给 60s） */
 export function updateResumeApi(resumeId, payload) {
 	return request({
 		url: `/v1/resume-data/${encodeURIComponent(resumeId)}`,
 		method: 'PUT',
 		data: payload,
+		timeout: 60000,
 	})
 }
 

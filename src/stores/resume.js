@@ -4,14 +4,14 @@
  * 设计原则：
  *   1. 简历对象本身是 reactive，编辑器/预览都直接读写它的属性 → 天然实时响应。
  *   2. v-model 直接绑 store.activeResume.basic.name 这种路径，不再走 action 包装。
- *   3. 持久化通过对 resumes 的 deep watch + 300ms debounce 自动完成。
+ *   3. 持久化通过对 resumes 的 deep watch + 500ms debounce 自动完成。
  *   4. 多简历切换通过替换 activeResumeId 实现，模板 ref 不变。
  */
 
 import { defineStore } from 'pinia'
 import { ref, reactive, computed, watch } from 'vue'
 import { createBlankResume, createNewResume, generateId, DEFAULT_GLOBAL_SETTINGS, DEFAULT_PHOTO_CONFIG, DEFAULT_FIELD_ORDER } from '@/utils/resume/initialData'
-import { toApiPayload, fromApiResponse, mergeMenuSections, mergeResumeWithDraft } from '@/utils/resume/serializer'
+import { toApiPayload, toSafeApiPayload, fromApiResponse, mergeMenuSections, mergeResumeWithDraft } from '@/utils/resume/serializer'
 import {
 	fetchResumeList,
 	fetchResumeDetail,
@@ -21,8 +21,8 @@ import {
 } from '@/api/resume'
 
 const STORAGE_KEY = 'magic_resume_store'
-const SAVE_DEBOUNCE_MS = 800
-const API_SAVE_DEBOUNCE_MS = 1200
+const SAVE_DEBOUNCE_MS = 500
+const API_SAVE_DEBOUNCE_MS = 2000
 
 // AI 返回的菜单项 → 前端菜单格式
 const AI_SECTION_MAP = {
@@ -403,8 +403,10 @@ export const useResumeStore = defineStore('resume', () => {
 
 		listLoading.value = true
 		syncError.value = ''
+		let payload = null
+		let usedSafe = false
 		try {
-			const payload = toApiPayload(draft)
+			payload = toApiPayload(draft)
 			console.log('========== [发送给 Java 后端] ==========')
 			console.log('Payload 基本信息:', payload.basic)
 			console.log('Payload 教育背景:', payload.education)
@@ -414,11 +416,21 @@ export const useResumeStore = defineStore('resume', () => {
 			console.log('Payload 自我评价:', payload.selfEvaluationContent)
 			console.log('=======================================')
 			
-			const res = await createResumeApi(payload)
+			let res = await createResumeApi(payload)
 			console.log('[Java 后端响应]:', res)
+
+			// 服务端 500 时尝试用精简 payload
+			if (!res.ok && res.raw && (res.raw.code === 500 || res.message?.includes('500')) && !usedSafe) {
+				console.warn('[createResumeFromParsedData] 服务端 500，尝试精简 payload 重试')
+				usedSafe = true
+				payload = toSafeApiPayload(draft)
+				res = await createResumeApi(payload)
+				console.log('[Java 后端精简响应]:', res)
+			}
 			
 			if (!res.ok) {
 				syncError.value = res.message || '创建失败'
+				console.warn('[createResumeFromParsedData] 创建失败:', { payload, response: res.raw })
 				return { success: false, message: syncError.value }
 			}
 
@@ -597,6 +609,15 @@ export const useResumeStore = defineStore('resume', () => {
 		Object.assign(activeResume.value.globalSettings, partial)
 	}
 
+	function updateCareerIntent(partial) {
+		const r = activeResume.value
+		if (!r) return
+		if (!r.customData) r.customData = {}
+		if (!r.customData.careerIntent) r.customData.careerIntent = {}
+		Object.assign(r.customData.careerIntent, partial)
+		r.updatedAt = new Date().toISOString()
+	}
+
 	function setThemeColor(color) {
 		updateGlobalSettings({ themeColor: color })
 	}
@@ -759,27 +780,96 @@ export const useResumeStore = defineStore('resume', () => {
 	let apiSaveTimer = null
 	let hydrated = false
 	let apiSaveInFlight = false
+	let apiSaveRetryCount = 0
+	let apiSaveFailureCooldownUntil = 0
+	let apiSaveSuccessPauseUntil = 0
+	let lastSavedPayloadHash = null
+	let lastSavedAt = 0
+	const API_SAVE_MAX_RETRIES = 1
+	const API_SAVE_COOLDOWN_MS = 30000
+	const API_SAVE_MIN_INTERVAL_MS = 5000
+	const API_SAVE_PAUSE_AFTER_SUCCESS_MS = 5000
 
-	async function _saveActiveToServer() {
+	function _hashString(str) {
+		let h = 0
+		for (let i = 0; i < str.length; i++) {
+			const c = str.charCodeAt(i)
+			h = ((h << 5) - h + c) | 0
+		}
+		return String(h)
+	}
+
+	async function _saveActiveToServer(useSafePayload = false) {
 		const r = activeResume.value
 		if (!r?.id || !_hasToken() || apiSaveInFlight) return
 
+		// 失败冷却期：服务端异常时暂停自动保存，避免无限重试
+		if (Date.now() < apiSaveFailureCooldownUntil) return
+
 		apiSaveInFlight = true
 		saving.value = true
+		let payload = null
 		try {
-			const res = await updateResumeApi(r.id, toApiPayload(r))
+			payload = useSafePayload ? toSafeApiPayload(r) : toApiPayload(r)
+			const payloadJson = JSON.stringify(payload)
+			const payloadHash = _hashString(payloadJson)
+			const payloadSizeKb = Math.round(payloadJson.length / 1024)
+
+			// 内容未变化，跳过
+			if (payloadHash === lastSavedPayloadHash && Date.now() - lastSavedAt < API_SAVE_MIN_INTERVAL_MS) {
+				return
+			}
+
+			console.log(`[save] resumeId=${r.id} mode=${useSafePayload ? 'safe' : 'full'} size=${payloadSizeKb}KB`)
+
+			const res = await updateResumeApi(r.id, payload)
 			if (!res.ok) {
-				syncError.value = res.message || '保存失败'
-				console.warn('简历保存失败:', res.message)
+				const status = res.code ?? res.statusCode ?? res.raw?.code
+				const message = res.message || '保存失败'
+				const isServerError = status === 500 || message.includes('500')
+				const isGatewayError = status === 502 || status === 503 || message.includes('502') || message.includes('Bad Gateway')
+				syncError.value = message
+
+				// 服务端异常：立即进入较长冷却期，避免连续重试压垮后端
+				if (isServerError || isGatewayError) {
+					apiSaveFailureCooldownUntil = Date.now() + API_SAVE_COOLDOWN_MS
+					apiSaveRetryCount = 0
+					if (isGatewayError) {
+						uni.showToast?.({ title: '无法连接到后端服务，已暂停自动保存', icon: 'none', duration: 3000 })
+					}
+					console.warn(`[save] 服务端异常 ${status || 500}，暂停 ${API_SAVE_COOLDOWN_MS / 1000}s`, { message, size: payloadJson.length })
+					return
+				}
+
+				// 业务错误（如 401/400）少量重试
+				if (apiSaveRetryCount < API_SAVE_MAX_RETRIES) {
+					apiSaveRetryCount += 1
+					const backoffMs = 5000 * apiSaveRetryCount
+					setTimeout(() => scheduleApiSave(), backoffMs)
+				} else {
+					apiSaveRetryCount = 0
+					apiSaveFailureCooldownUntil = Date.now() + API_SAVE_COOLDOWN_MS
+					uni.showToast?.({ title: '简历同步失败，请检查网络或稍后重试', icon: 'none', duration: 3000 })
+				}
 			} else {
+				apiSaveRetryCount = 0
+				apiSaveFailureCooldownUntil = 0
 				syncError.value = ''
+				lastSavedPayloadHash = payloadHash
+				lastSavedAt = Date.now()
+				// 保存成功后暂停下一轮自动保存，避免 merge 服务端回写数据触发再次保存
+				apiSaveSuccessPauseUntil = Date.now() + API_SAVE_PAUSE_AFTER_SUCCESS_MS
+
+				// 用服务端返回数据合并，但尽量不改变引用对象上的字段命名，减少 watch 触发
 				const updated = fromApiResponse(res.data)
 				if (updated) {
 					resumes[r.id] = mergeResumeWithDraft(r, { ...updated, id: r.id })
 				}
+				console.log('[save] ok')
 			}
 		} catch (e) {
-			console.error('_saveActiveToServer:', e)
+			console.error('[save] 异常:', e?.message || e)
+			apiSaveFailureCooldownUntil = Date.now() + API_SAVE_COOLDOWN_MS
 		} finally {
 			apiSaveInFlight = false
 			saving.value = false
@@ -788,6 +878,9 @@ export const useResumeStore = defineStore('resume', () => {
 
 	function scheduleApiSave() {
 		if (!hydrated || !_hasToken() || !activeResumeId.value) return
+		const now = Date.now()
+		// 保存成功后暂停期内，忽略自动保存调度
+		if (now < apiSaveSuccessPauseUntil) return
 		if (apiSaveTimer) clearTimeout(apiSaveTimer)
 		apiSaveTimer = setTimeout(() => {
 			apiSaveTimer = null
@@ -819,6 +912,17 @@ export const useResumeStore = defineStore('resume', () => {
 	// 任何字段变化都触发 debounced 本地 + 远端保存
 	watch([resumes, activeResumeId], scheduleSave, { deep: true })
 
+	// 切换简历时重置保存状态，避免上一份简历的暂停/哈希影响新简历
+	watch(activeResumeId, (newId, oldId) => {
+		if (newId !== oldId) {
+			lastSavedPayloadHash = null
+			lastSavedAt = 0
+			apiSaveSuccessPauseUntil = 0
+			apiSaveFailureCooldownUntil = 0
+			apiSaveRetryCount = 0
+		}
+	})
+
 	function saveToLocal() {
 		if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
 		_performSave()
@@ -830,7 +934,15 @@ export const useResumeStore = defineStore('resume', () => {
 			clearTimeout(apiSaveTimer)
 			apiSaveTimer = null
 		}
-		return _saveActiveToServer()
+		// 手动保存时临时解除成功暂停，确保用户点击保存按钮能立即执行
+		const prevPause = apiSaveSuccessPauseUntil
+		apiSaveSuccessPauseUntil = 0
+		const promise = _saveActiveToServer()
+		promise?.finally?.(() => {
+			// 如果手动保存失败，恢复原来的暂停保护；成功则由 _saveActiveToServer 重新设置
+			if (syncError.value) apiSaveSuccessPauseUntil = prevPause
+		})
+		return promise
 	}
 
 	function loadFromLocal() {
@@ -899,6 +1011,8 @@ export const useResumeStore = defineStore('resume', () => {
 		updateCustomItem,
 		deleteCustomItem,
 		reorderCustomItems,
+		// career intent
+		updateCareerIntent,
 		// AI
 		applyOptimizedModule,
 		// persistence

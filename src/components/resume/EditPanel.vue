@@ -19,18 +19,20 @@
 			</div>
 
 		<!-- 分区内容（key 强制在切换模块时重新挂载对应面板） -->
-		<component
-			:is="currentPanel"
-			v-if="currentPanel"
-			:key="activeSection"
-			v-bind="currentPanelProps"
-		/>
+		<transition name="section-fade" mode="out-in">
+			<component
+				:is="currentPanel"
+				v-if="currentPanel"
+				:key="activeSection"
+				v-bind="currentPanelProps"
+			/>
+		</transition>
 		</template>
 	</div>
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useResumeStore } from '@/stores/resume'
 import { normalizeMenuSection } from '@/utils/resume/serializer'
@@ -44,15 +46,19 @@ const currentSection = computed(() => {
 	return normalized.find(s => s.id === activeSection.value)
 })
 
-const panelMap = {
-	basic:          defineAsyncComponent(() => import('./sections/BasicPanel.vue')),
-	education:      defineAsyncComponent(() => import('./sections/EducationPanel.vue')),
-	experience:     defineAsyncComponent(() => import('./sections/ExperiencePanel.vue')),
-	projects:       defineAsyncComponent(() => import('./sections/ProjectPanel.vue')),
-	skills:         defineAsyncComponent(() => import('./sections/SkillPanel.vue')),
-	selfEvaluation: defineAsyncComponent(() => import('./sections/SelfEvaluationPanel.vue')),
-	certificates:   defineAsyncComponent(() => import('./sections/CertificatesPanel.vue')),
+const panelLoaders = {
+	basic:          () => import('./sections/BasicPanel.vue'),
+	education:      () => import('./sections/EducationPanel.vue'),
+	experience:     () => import('./sections/ExperiencePanel.vue'),
+	projects:       () => import('./sections/ProjectPanel.vue'),
+	skills:         () => import('./sections/SkillPanel.vue'),
+	selfEvaluation: () => import('./sections/SelfEvaluationPanel.vue'),
+	certificates:   () => import('./sections/CertificatesPanel.vue'),
 }
+
+const panelMap = Object.fromEntries(
+	Object.entries(panelLoaders).map(([key, loader]) => [key, defineAsyncComponent(loader)])
+)
 
 const CustomPanelComp = defineAsyncComponent(() => import('./sections/CustomPanel.vue'))
 
@@ -77,12 +83,26 @@ function renameSection(title) {
 	)
 	store.updateMenuSections(sections)
 }
+
+// 预加载相邻模块，切换时无需等待异步组件
+watch(activeSection, (id) => {
+	const list = (activeResume.value?.menuSections || [])
+		.map(normalizeMenuSection)
+		.filter(Boolean)
+		.sort((a, b) => a.order - b.order)
+	const idx = list.findIndex((s) => s.id === id)
+	const neighbors = [list[idx - 1], list[idx + 1]]
+	neighbors.forEach((s) => {
+		if (s && panelLoaders[s.id]) panelLoaders[s.id]()
+	})
+}, { immediate: true })
 </script>
 
 <style scoped lang="scss">
 .edit-panel {
 	height: 100%;
 	overflow-y: auto;
+	overscroll-behavior: contain;
 	background: var(--bg-card);
 	
 	&::-webkit-scrollbar {
@@ -98,6 +118,24 @@ function renameSection(title) {
 	&::-webkit-scrollbar-thumb:hover {
 		background: var(--text-muted);
 	}
+}
+
+/* ── Section switch cross-fade (200ms, 4px translateX) ── */
+.section-fade-enter-active,
+.section-fade-leave-active {
+	transition:
+		opacity 200ms cubic-bezier(0.4, 0, 0.2, 1),
+		transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.section-fade-enter-from {
+	opacity: 0;
+	transform: translateX(4px);
+}
+
+.section-fade-leave-to {
+	opacity: 0;
+	transform: translateX(-4px);
 }
 
 .empty-state {

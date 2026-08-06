@@ -58,7 +58,7 @@
 					<span>{{ progressMsg }}</span>
 				</div>
 
-				<div v-if="resultError" class="result-error">
+				<div v-if="resultError" class="result-error" role="alert">
 					<span class="error-icon">⚠️</span>
 					{{ resultError }}
 				</div>

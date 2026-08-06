@@ -13,11 +13,11 @@
 						mode="aspectFill"
 						@error="onAvatarError"
 					/>
-					<view class="user-info">
-						<text class="user-name">张同学</text>
-						<text class="user-major">计算机科学与技术 · 本科应届生</text>
-						<text class="user-stats">已完善简历 | 求职意向：前端工程师</text>
-					</view>
+				<view class="user-info">
+					<text class="user-name">{{ displayUserName }}</text>
+					<text class="user-major">{{ displayUserMajor }}</text>
+					<text class="user-stats">{{ displayUserStats }}</text>
+				</view>
 				</view>
 				<button class="edit-btn" @click="editProfile">编辑资料</button>
 			</view>
@@ -77,6 +77,25 @@ const displayAvatar = computed(() =>
 	avatarLoadFailed.value ? DEFAULT_AVATAR : userAvatar.value
 )
 
+const displayUserName = computed(() => {
+	if (isLogin.value && userInfo.value) {
+		return userInfo.value.nickname || userInfo.value.username || '张同学'
+	}
+	return '张同学'
+})
+
+const displayUserMajor = computed(() => {
+	if (isLogin.value && userInfo.value?.email) {
+		return userInfo.value.email
+	}
+	return '计算机科学与技术 · 本科应届生'
+})
+
+const displayUserStats = computed(() => {
+	if (isLogin.value) return '已登录 | 求职意向：前端工程师'
+	return '未登录 | 点击登录账号'
+})
+
 watch(userAvatar, () => {
 	avatarLoadFailed.value = false
 })
@@ -123,6 +142,7 @@ const editProfile = () => {
 
 <style scoped lang="scss">
 .my-main {
+	margin-left: var(--sidebar-width, 240px);
 	padding: 20px 32px 40px;
 }
 

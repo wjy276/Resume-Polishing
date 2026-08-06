@@ -13,6 +13,7 @@ import {
 	uploadResumeText,
 	runAgent,
 	runPipeline,
+	getAIBaseUrl,
 	startCoaching,
 	answerCoaching,
 	finishCoaching,
@@ -26,6 +27,7 @@ export const OPTIMIZE_STEPS = [
 	{ key: 'parse', label: '解析简历', icon: '📄' },
 	{ key: 'profile', label: '求职画像', icon: '🧭' },
 	{ key: 'optimize', label: '模块优化', icon: '✨' },
+	{ key: 'audit', label: '事实校对', icon: '🔍' },
 	{ key: 'done', label: '完成', icon: '✅' },
 ]
 
@@ -46,6 +48,8 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 	const optimizationPlan = ref(null)
 	const moduleResults = ref({})
 	const factCheckResult = ref(null)
+	const factCheckMessages = ref([])
+	const factCheckError = ref('')
 	const profileData = ref(null)
 	const chainRunning = ref(false)
 	const chainProgress = ref('')
@@ -286,6 +290,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 		const weakPoints = moduleDiagnoses.map((d) => ({
 			module: d.module,
 			name: d.module_label || d.module,
+			problems: d.problems_found || [],
 			description: d.problems_found?.join('；') || d.recommended_direction || '',
 			evidence: d.evidence_excerpt || '',
 			suggestion: d.recommended_direction || '',
@@ -321,6 +326,108 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			}
 		}
 		return result
+	}
+
+	function _buildFactCheckMessages(result) {
+		if (!result) return []
+		const messages = []
+		const audit = result.audit_result || {}
+		const report = result.optimization_report || {}
+
+		messages.push({
+			role: 'bot',
+			text: '已完成模块优化。现在进入 Agent 6 事实校对，帮你检查改写后的内容是否存在夸大、时间矛盾、缺少上下文等风险。',
+		})
+
+		if (audit.audit_summary) {
+			messages.push({
+				role: 'bot',
+				text: audit.audit_summary,
+				meta: { type: 'audit_summary', high_risk_count: audit.high_risk_count, total_issues: audit.total_issues },
+			})
+		}
+
+		const issues = audit.issues || []
+		const highRiskIssues = issues.filter((i) => i.risk_level === 'high')
+		if (highRiskIssues.length > 0) {
+			messages.push({
+				role: 'bot',
+				text: `发现 ${highRiskIssues.length} 个高风险问题，建议先核对以下地方：`,
+			})
+			for (const issue of highRiskIssues) {
+				messages.push({
+					role: 'bot',
+					text: issue.issue_description || issue.suggestion || '该处表述需要核实',
+					meta: {
+						type: 'issue',
+						issue,
+						options: [
+							{ label: '接受建议', value: 'accept', issue },
+							{ label: '查看原文对照', value: 'diff', issue },
+							{ label: '忽略', value: 'ignore', issue },
+						],
+					},
+				})
+			}
+		} else if (issues.length > 0) {
+			messages.push({
+				role: 'bot',
+				text: `未发现高风险问题，但有 ${issues.length} 处低风险提示，已整理在下方。`,
+			})
+		} else {
+			messages.push({
+				role: 'bot',
+				text: '未检测到明显事实风险，可直接应用优化结果。',
+			})
+		}
+
+		const changes = report.module_changes || []
+		if (changes.length > 0) {
+			messages.push({
+				role: 'bot',
+				text: `本次共改动了 ${changes.length} 个模块。下面是核心改动的对照说明：`,
+			})
+			for (const change of changes) {
+				messages.push({
+					role: 'bot',
+					text: `【${change.module_label || change.module}】\n优化前问题：${change.original_problems || '—'}\n为何这样改：${change.why_changed || '—'}\n具体改动：${change.what_changed || '—'}`,
+					meta: {
+						type: 'module_change',
+						change,
+						options: [
+							{ label: '应用该模块', value: 'apply_module', module: change.module },
+							{ label: '查看对照', value: 'diff_module', change },
+						],
+					},
+				})
+			}
+		}
+
+		const actionItems = report.action_items || []
+		if (actionItems.length > 0) {
+			messages.push({
+				role: 'bot',
+				text: '后续建议：\n' + actionItems.map((item, idx) => `${idx + 1}. ${item}`).join('\n'),
+				meta: { type: 'action_items', items: actionItems },
+			})
+		}
+
+		if (audit.is_safe_to_output) {
+			messages.push({
+				role: 'bot',
+				text: '✅ 事实审计通过。你可以点击下方「一键应用全部」将优化后的内容写回简历，也可以按模块逐条确认。',
+				meta: { type: 'done', safe: true },
+			})
+		} else {
+			messages.push({
+				role: 'bot',
+				text: '⚠️ 仍有高风险问题未处理。建议先核对标红的问题，或选择「忽略」后再应用。',
+				meta: { type: 'done', safe: false },
+			})
+		}
+
+		// 渲染上限：超过 100 条时丢弃最旧消息，避免长对话拖慢 AI 面板
+		return messages.slice(0, 100)
 	}
 
 	async function submitProfile(formData) {
@@ -395,9 +502,25 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			}
 		}
 
+		chainProgress.value = '正在校对事实与生成改动说明…'
+		const factRes = await runAgent('fact_checker', {}, sessionId.value)
+		if (factRes.ok) {
+			factCheckError.value = ''
+			const result = factRes.data?.result || factRes.data
+			factCheckResult.value = result
+			factCheckMessages.value = _buildFactCheckMessages(result)
+		} else {
+			factCheckError.value = factRes.message || '事实校验失败'
+			console.warn('[AI] fact_checker 失败，不影响主流程:', factRes.message, {
+				baseUrl: getAIBaseUrl(),
+				sessionId: sessionId.value,
+				raw: factRes.raw,
+			})
+		}
+
 		chainRunning.value = false
 		chainProgress.value = ''
-		currentStep.value = 'optimize'
+		currentStep.value = 'audit'
 		return { success: true }
 	}
 
@@ -515,6 +638,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 				return { success: false, message: error.value }
 			}
 			const parseRes = await runAgent('resume_parser', { raw_resume_text: resumeText }, sessionId.value)
+			console.log('[AI 解析] resume_parser 返回:', parseRes)
 			if (!parseRes.ok) {
 				error.value = parseRes.message || '解析失败'
 				return { success: false, message: error.value }
@@ -554,6 +678,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			if (!skipParse) {
 				chainProgress.value = '解析简历…'
 				const parseRes = await runAgent('resume_parser', {}, sessionId.value)
+				console.log('[AI 解析] resume_parser 返回:', parseRes)
 				if (!parseRes.ok) {
 					error.value = parseRes.message || '解析失败'
 					return { success: false, message: error.value }
@@ -600,7 +725,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 			}
 			optimizationPlan.value = stratRes.data?.optimization_plan || stratRes.data
 
-			// 6. 模块预优化
+			// 6. 模块预优化（Agent 5）
 			if (moduleIds && moduleIds.length > 0) {
 				chainProgress.value = '预计算模块优化…'
 				const modRes = await runAgent('module_optimizer', { modules: moduleIds }, sessionId.value)
@@ -614,10 +739,27 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 				}
 			}
 
+			// 7. 事实校对与改动说明（Agent 6）
+			chainProgress.value = '正在校对事实与生成改动说明…'
+			const factRes = await runAgent('fact_checker', {}, sessionId.value)
+			if (factRes.ok) {
+				factCheckError.value = ''
+				const result = factRes.data?.result || factRes.data
+				factCheckResult.value = result
+				factCheckMessages.value = _buildFactCheckMessages(result)
+			} else {
+				factCheckError.value = factRes.message || '事实校验失败'
+				console.warn('[AI] fact_checker 失败，不影响主流程:', factRes.message, {
+					baseUrl: getAIBaseUrl(),
+					sessionId: sessionId.value,
+					raw: factRes.raw,
+				})
+			}
+
 			chainRunning.value = false
 			chainProgress.value = ''
-			currentStep.value = 'optimize'
-			return { success: true }
+			currentStep.value = 'audit'
+			return { success: true, factCheckMessages: factCheckMessages.value }
 		} catch (e) {
 			chainRunning.value = false
 			chainProgress.value = ''
@@ -629,7 +771,14 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 	async function runFactChecker() {
 		const res = await runAgentByKey('fact_checker')
 		if (res.success && res.data) {
+			factCheckError.value = ''
 			factCheckResult.value = res.data?.result || res.data
+		} else {
+			factCheckError.value = res.message || '事实校验失败'
+			console.warn('[AI] fact_checker 失败，不影响主流程:', res.message, {
+				baseUrl: getAIBaseUrl(),
+				sessionId: sessionId.value,
+			})
 		}
 		return res
 	}
@@ -732,6 +881,15 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 					moduleResults.value[key] = val
 				}
 			}
+			if (state.audit_result || state.optimization_report) {
+				factCheckError.value = ''
+				const result = {
+					audit_result: state.audit_result,
+					optimization_report: state.optimization_report,
+				}
+				factCheckResult.value = result
+				factCheckMessages.value = _buildFactCheckMessages(result)
+			}
 			return { success: true, state }
 		}
 		return { success: false }
@@ -781,6 +939,8 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 		optimizationPlan.value = null
 		moduleResults.value = {}
 		factCheckResult.value = null
+		factCheckMessages.value = []
+		factCheckError.value = ''
 		profileData.value = null
 		chainRunning.value = false
 		chainProgress.value = ''
@@ -806,6 +966,8 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 		optimizationPlan,
 		moduleResults,
 		factCheckResult,
+		factCheckMessages,
+		factCheckError,
 		profileData,
 		chainRunning,
 		chainProgress,

@@ -3,6 +3,15 @@
 		<!-- ── Header ── -->
 		<header class="editor-header">
 			<div class="header-left">
+				<button
+					class="menu-btn"
+					:class="{ open: !sidePanelCollapsed }"
+					@click="sidePanelCollapsed = !sidePanelCollapsed"
+					title="切换设置面板"
+					aria-label="切换设置面板"
+				>
+					<svg viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+				</button>
 				<button class="back-btn" @click="goBack" title="返回">
 					<svg viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
 				</button>
@@ -31,13 +40,14 @@
 			<div class="header-right">
 				<input
 					class="title-input"
+					:class="{ saved: saveFlash }"
 					:value="resumeTitle"
 					@input="handleTitleInput"
 					@blur="handleTitleBlur"
 					placeholder="简历名称"
 					:key="activeResume?.id"
 				/>
-				<button class="save-btn" @click="handleSave" :disabled="saving">
+				<button class="save-btn" :class="{ saved: saveFlash }" @click="handleSave" :disabled="saving">
 					<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M2 2h9l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10 2v4H5V2M5 14v-4h6v4" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
 					<span class="save-label">{{ saving ? '保存中...' : '保存' }}</span>
 				</button>
@@ -45,19 +55,19 @@
 					<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
 					<span class="ai-label">AI 优化</span>
 				</button>
-				<button class="export-btn" @click="exportPdf">
+				<button class="export-btn" @click="exportPdf" :disabled="exportingPdf">
 					<svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M8 2v9M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-					<span class="export-label">导出 PDF</span>
+					<span class="export-label">{{ exportingPdf ? '导出中…' : '导出 PDF' }}</span>
 				</button>
 			</div>
 		</header>
 
 		<!-- ── 3-panel body ── -->
-		<div class="editor-body">
+		<div class="editor-body" :class="{ 'analysis-open': showAnalysisPanel, 'side-panel-open': !sidePanelCollapsed }">
 
 			<!-- Left: SidePanel -->
 			<transition name="slide-left">
-				<div v-show="!sidePanelCollapsed" class="panel panel-side">
+				<div v-show="!sidePanelCollapsed" class="panel panel-side" :class="{ 'panel-side--open': !sidePanelCollapsed }">
 					<SidePanel />
 				</div>
 			</transition>
@@ -134,11 +144,25 @@
 			@submit="handleChatSubmit"
 		/>
 
+		<AIOptimizeAnalysisPanel
+			:visible="showAnalysisPanel"
+			@close="showAnalysisPanel = false"
+			@regenerate="openAIPanel"
+			@apply-all="handleApplyAllOptimizations"
+			@apply-module="handleApplyModuleOptimization"
+			@option-action="handleAIOptionAction"
+		/>
+
 		<SaveAsTemplateDialog
 			v-model:visible="showSaveTemplate"
 			:resume-data="activeResume"
 			@saved="handleTemplateSaved"
 		/>
+
+		<button class="mobile-ai-fab" @click="openAIPanel" aria-label="AI 优化">
+			<svg viewBox="0 0 16 16" fill="none"><path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+			<span>AI</span>
+		</button>
 	</div>
 </template>
 
@@ -149,6 +173,8 @@ import { onLoad } from '@dcloudio/uni-app'
 import { useResumeStore } from '@/stores/resume'
 import { editorResumeToAgentInput } from '@/utils/resume/agentAdapter'
 import { useAIOptimizeStore } from '@/stores/aiOptimize'
+import { useCareerIntentStore } from '@/stores/careerIntent'
+import { useUserStore } from '@/stores/user'
 import { createNewResume } from '@/utils/resume/initialData'
 import { normalizeMenuSection } from '@/utils/resume/serializer'
 import SidePanel from '@/components/resume/SidePanel.vue'
@@ -156,14 +182,20 @@ import EditPanel from '@/components/resume/EditPanel.vue'
 import ClassicTemplate from '@/components/resume/ClassicTemplate.vue'
 import AIOptimizeDialog from '@/components/AIOptimize/AIOptimizeDialog.vue'
 import ChatDialog from '@/components/AIOptimize/ChatDialog.vue'
+import AIOptimizeAnalysisPanel from '@/components/AIOptimize/AIOptimizeAnalysisPanel.vue'
 import SaveAsTemplateDialog from '@/components/TemplateGallery/SaveAsTemplateDialog.vue'
 
 const A4_WIDTH_PX = 794   // 210mm at 96dpi
 
 const store = useResumeStore()
 const aiStore = useAIOptimizeStore()
+const careerIntentStore = useCareerIntentStore()
+const userStore = useUserStore()
 // storeToRefs ensures activeResume stays reactive and always reflects latest store state
 const { activeResume } = storeToRefs(store)
+
+// Track whether career_profiler has been run for current resume to avoid duplicate calls
+const careerProfileRunForId = ref(null)
 
 const sidePanelCollapsed = ref(false)
 const editPanelCollapsed = ref(false)
@@ -173,6 +205,7 @@ const manualScale = ref(null)  // null = auto-fit
 const showSaveTemplate = ref(false)
 const showAIDialog = ref(false)
 const showChatDialog = ref(false)
+const showAnalysisPanel = ref(false)
 let pendingModuleIds = []
 
 const resumeTitle = computed(() => activeResume.value?.title || '未命名简历')
@@ -238,6 +271,11 @@ watch([sidePanelCollapsed, editPanelCollapsed], () => {
 	nextTick(measurePreviewPanel)
 })
 
+// ── AI analysis panel open/close → re-measure ─────────────────────
+watch(showAnalysisPanel, () => {
+	nextTick(measurePreviewPanel)
+})
+
 // ── Resize observer ──────────────────────────────────────────────
 let resizeObs = null
 
@@ -253,50 +291,64 @@ onMounted(() => {
 })
 
 // ── onLoad ────────────────────────────────────────────────────────
-onLoad(async (options) => {
-	store.loadFromLocal()
-	const resumeId = options?.id
-	const templateId = options?.templateId
-	const aiOptimize = options?.aiOptimize
+	onLoad(async (options) => {
+		store.loadFromLocal()
 
-	if (resumeId) {
-		store.setActiveResume(resumeId)
-		const token = uni.getStorageSync('token')
-		if (token) {
-			const result = await store.loadResumeFromServer(resumeId)
-			if (!result.success && !store.resumes[resumeId]) {
-				uni.showToast({ title: result.message || '简历不存在', icon: 'none' })
+		// 加载当前用户的求职意向提示词
+		const userInfo = userStore.userInfo
+		const userId = userInfo?.userId || userInfo?.id
+		if (userId) {
+			careerIntentStore.setUserId(String(userId))
+			await careerIntentStore.fetchCareerIntent(String(userId))
+		}
+
+		const resumeId = options?.id
+		const templateId = options?.templateId
+		const aiOptimize = options?.aiOptimize
+
+		if (resumeId) {
+			store.setActiveResume(resumeId)
+			const token = uni.getStorageSync('token')
+			if (token) {
+				const result = await store.loadResumeFromServer(resumeId)
+				if (!result.success && !store.resumes[resumeId]) {
+					uni.showToast({ title: result.message || '简历不存在', icon: 'none' })
+					setTimeout(() => goBack(), 1200)
+					return
+				}
+			} else if (!store.resumes[resumeId]) {
+				uni.showToast({ title: '简历不存在', icon: 'none' })
 				setTimeout(() => goBack(), 1200)
 				return
 			}
-		} else if (!store.resumes[resumeId]) {
-			uni.showToast({ title: '简历不存在', icon: 'none' })
-			setTimeout(() => goBack(), 1200)
-			return
-		}
-	} else if (!store.activeResume) {
-		const keys = Object.keys(store.resumes)
-		if (keys.length) {
-			store.activeResumeId = keys[0]
-		} else {
-			const result = await store.createResumeOnServer({ title: '我的简历' })
-			if (!result.success) {
-				const resume = createNewResume({ title: '我的简历' })
-				store.resumes[resume.id] = resume
-				store.activeResumeId = resume.id
-				store.saveToLocal()
+		} else if (!store.activeResume) {
+			const keys = Object.keys(store.resumes)
+			if (keys.length) {
+				store.activeResumeId = keys[0]
+			} else {
+				const result = await store.createResumeOnServer({ title: '我的简历' })
+				if (!result.success) {
+					const resume = createNewResume({ title: '我的简历' })
+					store.resumes[resume.id] = resume
+					store.activeResumeId = resume.id
+					store.saveToLocal()
+				}
 			}
 		}
-	}
 
-	if (templateId) {
-		store.setTemplateId(decodeURIComponent(templateId))
-	}
+		if (templateId) {
+			store.setTemplateId(decodeURIComponent(templateId))
+		}
 
-	if (aiOptimize === '1') {
-		setTimeout(() => aiStore.openPanel(), 500)
-	}
-})
+		// 进入简历页面时，如果有求职意向，先同步到 AI 会话
+		if (activeResume.value?.customData?.careerIntent?.targetRole?.trim()) {
+			await runCareerProfiler()
+		}
+
+		if (aiOptimize === '1') {
+			setTimeout(() => aiStore.openPanel(), 500)
+		}
+	})
 
 onUnmounted(() => {
 	resizeObs?.disconnect()
@@ -305,19 +357,80 @@ onUnmounted(() => {
 
 // ── Navigation ───────────────────────────────────────────────────
 function goBack() {
-	uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/Resume/Resume' }) })
+	const doNav = () =>
+		uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/Resume/Resume' }) })
+	// View Transition API：浏览器支持时走过渡，避免页面切换白屏闪烁
+	if (typeof document !== 'undefined' && document.startViewTransition) {
+		document.startViewTransition(doNav)
+	} else {
+		doNav()
+	}
 }
 
 const saving = ref(false)
+const saveFlash = ref(false)
+const exportingPdf = ref(false)
+
+function getCareerIntentFormData() {
+	// 优先从当前简历的 customData 读取，若不存在则 fallback 到用户全局求职意向
+	let ci = activeResume.value?.customData?.careerIntent
+	if (!ci?.targetRole?.trim() && careerIntentStore.isFilled) {
+		ci = {
+			targetRole: careerIntentStore.targetRole,
+			experienceYear: careerIntentStore.experienceYear,
+			targetCities: careerIntentStore.targetCities,
+			coreSkills: careerIntentStore.coreSkills,
+			extraInfo: careerIntentStore.extraInfo,
+		}
+	}
+	if (!ci?.targetRole?.trim()) return null
+
+	const targetCities = (ci.targetCities || '').split(/[,，]/).map(s => s.trim()).filter(Boolean)
+	const coreSkills = (ci.coreSkills || '').split(/[,，]/).map(s => s.trim()).filter(Boolean)
+
+	return {
+		targetRole: ci.targetRole.trim(),
+		experienceYear: (ci.experienceYear || '').trim(),
+		targetCities,
+		coreSkills,
+		extraInfo: (ci.extraInfo || '').trim()
+	}
+}
+
+function buildCareerProfileQuery(formData) {
+	const parts = []
+	if (formData.targetRole) parts.push(`目标岗位：${formData.targetRole}`)
+	if (formData.experienceYear) parts.push(`工作年限：${formData.experienceYear}`)
+	if (formData.targetCities?.length) parts.push(`目标城市：${formData.targetCities.join('、')}`)
+	if (formData.coreSkills?.length) parts.push(`核心技能：${formData.coreSkills.join('、')}`)
+	if (formData.extraInfo) parts.push(`补充信息：${formData.extraInfo}`)
+	return parts.join('\n')
+}
+
+async function runCareerProfiler() {
+	const formData = getCareerIntentFormData()
+	if (!formData) return { success: false, message: '无求职意向' }
+
+	const userQuery = buildCareerProfileQuery(formData)
+
+	const initRes = await aiStore.initSession(true, userQuery)
+	if (!initRes.success) return initRes
+
+	return await aiStore.submitProfile(formData)
+}
 
 async function handleSave() {
 	if (!activeResume.value) return
-	
+
 	saving.value = true
 	try {
 		const result = await store.saveActiveToServer()
 		if (result?.success) {
 			uni.showToast({ title: '保存成功', icon: 'success' })
+			saveFlash.value = true
+			setTimeout(() => { saveFlash.value = false }, 400)
+			// 保存后同步更新求职画像到 AI 会话
+			await runCareerProfiler()
 		} else {
 			uni.showToast({ title: result?.message || '保存失败', icon: 'none' })
 		}
@@ -332,6 +445,9 @@ async function handleSave() {
 async function openAIPanel() {
 	const resume = activeResume.value
 	if (!resume) return
+
+	// 先调用 career_profiler 建立求职画像
+	await runCareerProfiler()
 
 	const agentInput = editorResumeToAgentInput(resume)
 	const textParts = []
@@ -356,20 +472,46 @@ async function openAIPanel() {
 	const sections = resume?.menuSections || []
 	pendingModuleIds = sections.filter(s => s.enabled && s.id !== 'basic').map(s => s.id)
 
+	showAnalysisPanel.value = true
+
+	// 1. 解析简历（上传 + 简历解析 agent）
 	const parseRes = await aiStore.parseExistingResume(resumeText)
 	if (!parseRes.success) {
+		uni.showToast({ title: parseRes.message || '简历解析失败', icon: 'none' })
 		return
 	}
 
-	showChatDialog.value = true
+	// 2. 运行 agent 链：诊断 + 策略 + 模块优化（agent5）
+	// 把弹窗中已粘贴的目标岗位 JD 传给后端，避免用户重复输入
+	const optRes = await aiStore.runFullOptimization({
+		prompt: '',
+		jdText: careerIntentStore.jdText || '',
+		moduleIds: pendingModuleIds,
+		skipParse: true,
+	})
+	if (!optRes.success) {
+		uni.showToast({ title: optRes.message || '匹配分析失败', icon: 'none' })
+	}
 }
 
 async function handleChatSubmit(profileData) {
 	showChatDialog.value = false
 
+	// 如果聊天中补充了求职意向，回写到简历
+	const ci = activeResume.value?.customData?.careerIntent || {}
+	if (profileData.targetRole && !ci.targetRole) {
+		store.updateCareerIntent({
+			targetRole: profileData.targetRole,
+			experienceYear: profileData.experienceYear || '',
+			targetCities: profileData.targetCities || '',
+			coreSkills: profileData.coreSkills || '',
+			extraInfo: profileData.extraInfo || ''
+		})
+	}
+
 	const res = await aiStore.runFullOptimization({
 		prompt: Object.entries(profileData).filter(([,v]) => v).map(([k,v]) => `${k}：${v}`).join('\n'),
-		jdText: '',
+		jdText: careerIntentStore.jdText || '',
 		moduleIds: pendingModuleIds,
 		skipParse: true,
 	})
@@ -381,6 +523,69 @@ async function handleChatSubmit(profileData) {
 
 function handleTemplateSaved() {
 	uni.showToast({ title: '模板已保存', icon: 'success' })
+}
+
+function applyModuleContent(module, item) {
+	const html = item?.optimized_html || ''
+	if (!html) return false
+
+	switch (module) {
+		case 'summary':
+			store.updateSelfEvaluation(html)
+			return true
+		case 'skills':
+			store.updateSkillContent(html)
+			return true
+		case 'experience':
+		case 'projects':
+		case 'education':
+			// 结构化模块暂不自动覆盖，避免丢失多条目细节
+			return false
+		default:
+			return false
+	}
+}
+
+function handleApplyModuleOptimization(module) {
+	const item = aiStore.moduleResults?.[module]
+	if (!item) return
+
+	const applied = applyModuleContent(module, item)
+	if (applied) {
+		uni.showToast({ title: '已应用该模块优化', icon: 'success' })
+	} else {
+		uni.showToast({ title: '结构化模块请手动参考建议修改', icon: 'none' })
+	}
+}
+
+function handleApplyAllOptimizations() {
+	const results = aiStore.moduleResults || {}
+	let appliedCount = 0
+	let skippedCount = 0
+
+	for (const [module, item] of Object.entries(results)) {
+		const applied = applyModuleContent(module, item)
+		if (applied) {
+			appliedCount++
+		} else if (item?.optimized_html) {
+			skippedCount++
+		}
+	}
+
+	if (appliedCount > 0) {
+		uni.showToast({
+			title: `已应用 ${appliedCount} 个模块，${skippedCount > 0 ? skippedCount + ' 个需手动确认' : ''}`,
+			icon: 'success',
+			duration: 2000,
+		})
+	} else {
+		uni.showToast({ title: '暂无可自动应用的文本模块', icon: 'none' })
+	}
+}
+
+function handleAIOptionAction(option) {
+	console.log('[AI Option Action]', option)
+	// Parent can extend: e.g. track accepted/ignored issues in a set
 }
 
 function handleTitleInput(e) {
@@ -396,20 +601,19 @@ function handleTitleBlur(e) {
 
 // ── PDF export ───────────────────────────────────────────────────
 function exportPdf() {
-	if (typeof window === 'undefined') return
+	if (typeof window === 'undefined' || exportingPdf.value) return
 	const el = document.getElementById('resume-preview')
 	if (!el) return
+	exportingPdf.value = true
 
-	const styles = Array.from(document.styleSheets)
-		.map(sheet => {
-			try { return Array.from(sheet.cssRules).map(r => r.cssText).join('\n') }
-			catch { return '' }
-		}).join('\n')
+	try {
+		const styles = Array.from(document.styleSheets)
+			.map(sheet => {
+				try { return Array.from(sheet.cssRules).map(r => r.cssText).join('\n') }
+				catch { return '' }
+			}).join('\n')
 
-	const win = window.open('', '_blank')
-	if (!win) { uni.showToast({ title: '请允许弹出窗口', icon: 'none' }); return }
-
-	win.document.write(`<!DOCTYPE html><html><head>
+		const html = `<!DOCTYPE html><html><head>
 <meta charset="utf-8"><title>${resumeTitle.value}</title>
 <style>
   *{box-sizing:border-box;}
@@ -420,9 +624,37 @@ function exportPdf() {
 </style></head><body>
 <div style="width:210mm;min-height:297mm;padding:${gs.value.pagePadding ?? 32}px;font-family:${gs.value.fontFamily === 'default' ? 'inherit' : (gs.value.fontFamily || 'inherit')}">
 ${el.innerHTML}
-</div></body></html>`)
-	win.document.close()
-	setTimeout(() => { win.focus(); win.print() }, 700)
+</div></body></html>`
+
+		// 用 Blob URL + 隐藏 iframe 异步加载打印文档，避免 document.write 阻塞主线程
+		const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+		const url = URL.createObjectURL(blob)
+		const iframe = document.createElement('iframe')
+		iframe.setAttribute('aria-hidden', 'true')
+		iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;'
+		iframe.onload = () => {
+			setTimeout(() => {
+				try {
+					iframe.contentWindow.focus()
+					iframe.contentWindow.print()
+				} catch (e) {
+					console.error('[export] 打印失败:', e)
+					uni.showToast({ title: '导出失败，请重试', icon: 'none' })
+				}
+				setTimeout(() => {
+					URL.revokeObjectURL(url)
+					iframe.remove()
+				}, 60000)
+			}, 300)
+		}
+		document.body.appendChild(iframe)
+		iframe.src = url
+	} catch (e) {
+		console.error('[export] 导出异常:', e)
+		uni.showToast({ title: '导出失败', icon: 'none' })
+	} finally {
+		exportingPdf.value = false
+	}
 }
 </script>
 
@@ -437,15 +669,15 @@ ${el.innerHTML}
 
 /* ── Header ──────────────────────────────── */
 .editor-header {
-	height: 52px;
-	min-height: 52px;
+	height: 56px;
+	min-height: 56px;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	padding: 0 12px 0 8px;
 	border-bottom: 1px solid var(--border-color);
 	background: var(--bg-card);
-	z-index: 30;
+	z-index: 50;
 	flex-shrink: 0;
 	gap: 8px;
 }
@@ -455,6 +687,25 @@ ${el.innerHTML}
 	align-items: center;
 	gap: 8px;
 	flex-shrink: 0;
+}
+
+.menu-btn {
+	display: none;
+	width: 30px;
+	height: 30px;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	background: transparent;
+	color: var(--text-secondary);
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	transition: background var(--transition-fast), color var(--transition-fast), transform 0.1s ease;
+
+	svg { width: 16px; height: 16px; }
+	&:hover { background: var(--bg-page); color: var(--text-primary); }
+	&:active { transform: scale(0.95); }
+	&.open { color: var(--color-accent-primary); background: var(--color-accent-subtle); }
 }
 
 .back-btn {
@@ -538,11 +789,23 @@ ${el.innerHTML}
 	font-size: 12px;
 	color: var(--text-secondary);
 	cursor: pointer;
-	transition: all var(--transition-fast);
+	transition: color 150ms ease, background var(--transition-fast);
 	white-space: nowrap;
 	position: relative;
 
 	.tab-icon { font-size: 12px; }
+
+	&::after {
+		content: '';
+		position: absolute;
+		bottom: 0;
+		left: 50%;
+		width: 0;
+		height: 2px;
+		background: var(--color-accent-primary);
+		border-radius: 2px;
+		transition: width 150ms ease, left 150ms ease;
+	}
 
 	&:hover { 
 		background: var(--bg-page); 
@@ -550,10 +813,13 @@ ${el.innerHTML}
 		transform: translateY(-1px);
 	}
 	&.active { 
-		background: rgba(37, 99, 235, 0.1); 
-		color: var(--primary-light); 
+		background: var(--color-accent-subtle);
+		color: var(--color-accent-primary);
 		font-weight: 600;
-		box-shadow: inset 0 1px 2px rgba(37, 99, 235, 0.1);
+	}
+	&.active::after {
+		width: 100%;
+		left: 0;
 	}
 
 	@media (max-width: 1100px) {
@@ -584,12 +850,21 @@ ${el.innerHTML}
 	transition: all var(--transition-fast);
 
 	&:focus {
-		border-color: var(--primary-light);
+		border-color: var(--color-border-focus);
 		background: var(--bg-card);
-		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+		box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+	}
+
+	&.saved {
+		animation: saveFlash 400ms ease;
 	}
 
 	@media (max-width: 768px) { display: none; }
+}
+
+@keyframes saveFlash {
+	0%, 100% { border-color: var(--color-border-subtle); }
+	50% { border-color: var(--color-success); box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15); }
 }
 
 .export-btn {
@@ -597,7 +872,7 @@ ${el.innerHTML}
 	align-items: center;
 	gap: 5px;
 	padding: 6px 14px;
-	background: var(--text-primary);
+	background: #2563eb;
 	color: #fff;
 	border: none;
 	border-radius: var(--radius-sm);
@@ -608,14 +883,16 @@ ${el.innerHTML}
 	white-space: nowrap;
 
 	&:hover { 
-		background: #374151; 
+		background: #1d4ed8; 
 		transform: translateY(-1px);
-		box-shadow: var(--shadow-sm);
+		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 	}
 	&:active { 
-		background: #1f2937; 
-		transform: translateY(0);
+		background: #1e40af; 
+		transform: translateY(0) scale(0.98);
+		transition-duration: 80ms;
 	}
+	&:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
 	@media (max-width: 640px) {
 		.export-label { display: none; }
@@ -628,7 +905,7 @@ ${el.innerHTML}
 	align-items: center;
 	gap: 5px;
 	padding: 6px 14px;
-	background: linear-gradient(135deg, var(--primary-light), #3b82f6);
+	background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-hover));
 	color: #fff;
 	border: none;
 	border-radius: var(--radius-sm);
@@ -642,10 +919,11 @@ ${el.innerHTML}
 
 	&:hover { 
 		transform: translateY(-1px);
-		box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+		box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 	}
 	&:active { 
-		transform: translateY(0);
+		transform: translateY(0) scale(0.98);
+		transition-duration: 80ms;
 	}
 
 	@media (max-width: 640px) {
@@ -703,16 +981,21 @@ ${el.innerHTML}
 	&:hover { 
 		background: #059669; 
 		transform: translateY(-1px);
-		box-shadow: var(--shadow-sm);
+		box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
 	}
 	&:active { 
 		background: #047857;
-		transform: translateY(0);
+		transform: translateY(0) scale(0.98);
+		transition-duration: 80ms;
 	}
 	&:disabled { 
 		opacity: 0.5; 
 		cursor: not-allowed;
 		transform: none;
+		box-shadow: none;
+	}
+	&.saved {
+		animation: saveFlash 400ms ease;
 	}
 
 	@media (max-width: 640px) {
@@ -727,6 +1010,33 @@ ${el.innerHTML}
 	display: flex;
 	overflow: hidden;
 	min-height: 0;
+	transition: padding-right 0.3s ease;
+}
+
+.editor-body.analysis-open {
+	padding-right: 336px;
+}
+
+/* ── H5 输入框 pointer-events 修复（仅作用于简历编辑器内部，避免影响全局页面） ── */
+:deep(.workbench-page) {
+	uni-input,
+	uni-textarea,
+	uni-input *,
+	uni-textarea * {
+		pointer-events: auto !important;
+	}
+
+	uni-input input,
+	uni-textarea textarea,
+	.uni-input-input,
+	.uni-textarea-textarea {
+		pointer-events: auto !important;
+		user-select: text !important;
+		-webkit-user-select: text !important;
+		-moz-user-select: text !important;
+		-ms-user-select: text !important;
+		cursor: text !important;
+	}
 }
 
 /* ── Panels ── */
@@ -737,10 +1047,11 @@ ${el.innerHTML}
 }
 
 .panel-side {
-	width: 256px;
+	width: 280px;
 	border-right: 1px solid var(--border-color);
-	background: #fafafa;
+	background: var(--bg-card);
 	transition: width var(--transition-normal), opacity var(--transition-normal);
+	overscroll-behavior: contain;
 }
 
 .panel-edit {
@@ -748,6 +1059,7 @@ ${el.innerHTML}
 	border-right: 1px solid var(--border-color);
 	background: var(--bg-card);
 	overflow-y: auto;
+	overscroll-behavior: contain;
 	transition: width var(--transition-normal), opacity var(--transition-normal);
 }
 
@@ -776,6 +1088,8 @@ ${el.innerHTML}
 	height: 100%;
 	overflow-y: auto;
 	overflow-x: hidden;
+	overscroll-behavior: contain;
+	scroll-behavior: smooth;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -802,6 +1116,7 @@ ${el.innerHTML}
 	flex-shrink: 0;
 	transform-origin: top center;
 	transition: transform 0.2s ease;
+	will-change: transform;
 }
 
 .a4-paper {
@@ -838,6 +1153,7 @@ ${el.innerHTML}
 	z-index: 20;
 	white-space: nowrap;
 	transition: all var(--transition-fast);
+	will-change: transform;
 	
 	&:hover {
 		box-shadow: var(--shadow-lg);
@@ -886,6 +1202,31 @@ ${el.innerHTML}
 	text-align: center;
 }
 
+.mobile-ai-fab {
+	display: none;
+	position: fixed;
+	right: 16px;
+	bottom: 24px;
+	z-index: 80;
+	align-items: center;
+	gap: 5px;
+	padding: 12px 18px;
+	border: none;
+	border-radius: 9999px;
+	background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-hover));
+	color: #fff;
+	font-size: 13px;
+	font-weight: 600;
+	box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
+	cursor: pointer;
+	transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms ease;
+
+	svg { width: 15px; height: 15px; }
+
+	&:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(99, 102, 241, 0.4); }
+	&:active { transform: translateY(0) scale(0.97); transition-duration: 80ms; }
+}
+
 /* ── Responsive ── */
 @media (max-width: 1200px) {
 	.panel-side {
@@ -894,6 +1235,62 @@ ${el.innerHTML}
 	.panel-edit {
 		width: 300px;
 	}
+}
+
+/* ── Laptop（1024-1279px）：AI 面板作为可折叠抽屉，不挤压正文 ── */
+@media (max-width: 1279px) {
+	.editor-body.analysis-open {
+		padding-right: 0;
+	}
+}
+
+/* ── Tablet（768-1023px）：左侧面板变为汉堡抽屉 ── */
+@media (max-width: 1023px) {
+	.menu-btn { display: flex; }
+
+	.panel-side {
+		position: fixed;
+		top: 56px;
+		bottom: 0;
+		left: 0;
+		width: 280px;
+		z-index: 45;
+		box-shadow: 8px 0 24px rgba(0, 0, 0, 0.08);
+		transform: translateX(-100%);
+	}
+	.panel-side.panel-side--open {
+		transform: translateX(0);
+	}
+
+	.slide-left-enter-active,
+	.slide-left-leave-active {
+		transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+	}
+	.slide-left-enter-from,
+	.slide-left-leave-to {
+		width: 280px !important;
+		transform: translateX(-100%);
+		opacity: 0;
+	}
+	.slide-left-enter-to {
+		transform: translateX(0);
+	}
+
+	.editor-body.side-panel-open::after {
+		content: '';
+		position: fixed;
+		inset: 56px 0 0 0;
+		background: rgba(0, 0, 0, 0.2);
+		z-index: 44;
+		pointer-events: none;
+	}
+}
+
+/* ── Mobile（<768px）：单栏预览 + 底部固定 AI 入口 ── */
+@media (max-width: 767px) {
+	.panel-edit { display: none !important; }
+	.mobile-ai-fab { display: flex; }
+	.preview-scroll { padding: 16px 12px 96px; }
 }
 
 @media (max-width: 900px) {

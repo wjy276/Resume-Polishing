@@ -136,8 +136,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
-
-const BASE_URL = 'http://81.71.75.85:6008/api'
+import { fetchPositionDetail } from '@/api/job'
 
 const jobId = ref('')
 const isFavorited = ref(false)
@@ -197,27 +196,15 @@ const shareJob = () => {
 	})
 }
 
-const getJobDetail = (positionId) => {
+const getJobDetail = async (positionId) => {
 	loading.value = true
-	uni.request({
-		url: `${BASE_URL}/v1/position/${positionId}`,
-		method: 'GET',
-		header: {
-			'Content-Type': 'application/json',
-			'Accept': 'application/json'
-		},
-		success: (res) => {
-			if (res.statusCode === 200 && (res.data?.code === 0 || res.data?.code === 200)) {
-				jobData.value = res.data.data
-			}
-		},
-		fail: () => {
-			uni.showToast({ title: '网络错误', icon: 'none' })
-		},
-		complete: () => {
-			loading.value = false
-		}
-	})
+	const res = await fetchPositionDetail(positionId)
+	if (res.ok) {
+		jobData.value = res.data
+	} else {
+		uni.showToast({ title: res.message || '获取职位详情失败', icon: 'none' })
+	}
+	loading.value = false
 }
 
 onMounted(() => {
@@ -232,6 +219,7 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .job-detail-main {
+	margin-left: var(--sidebar-width, 240px);
 	padding: 20px 32px 40px;
 	overflow-y: auto;
 }

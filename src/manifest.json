@@ -76,7 +76,18 @@
                 "/api" : {
                     "target" : "http://81.71.75.85:6008",
                     "changeOrigin" : true,
-                    "secure" : false
+                    "secure" : false,
+                    "ws" : false,
+                    "timeout" : 60000,
+                    "proxyTimeout" : 60000
+                },
+                "/ai-api" : {
+                    "target" : "http://localhost:8000",
+                    "changeOrigin" : true,
+                    "secure" : false,
+                    "ws" : false,
+                    "timeout" : 600000,
+                    "proxyTimeout" : 600000
                 }
             }
         },

@@ -6,9 +6,17 @@
  */
 
 // 开发环境使用代理，生产环境使用完整 URL
-const AI_BASE_URL = import.meta.env.DEV ? '/ai-api' : 'http://localhost:8000/api'
+// VITE_AI_BASE_URL overrides the AI service base URL (e.g. deployed production).
+const AI_BASE_URL =
+	import.meta.env.VITE_AI_BASE_URL ||
+	(import.meta.env.DEV ? '/ai-api' : 'http://localhost:8000/api')
 
-function getAIBaseUrl() {
+// Agent 单步执行耗时较长（fact_checker 单次最长 180s，最多重试 2 次），需要大于后端超时
+const AI_AGENT_TIMEOUT = 600000
+// 完整流水线在服务端串行跑完所有 Agent，耗时可能超过 10 分钟
+const AI_PIPELINE_TIMEOUT = 900000
+
+export function getAIBaseUrl() {
 	return AI_BASE_URL
 }
 
@@ -16,7 +24,7 @@ function getAIBaseUrl() {
  * 统一 AI 请求封装（基于 uni.request）
  * 自动携带 Cookie，支持跨域会话保持
  */
-function aiRequest(options) {
+export function aiRequest(options) {
 	const { url, method = 'GET', data, query, timeout } = options
 
 	let fullUrl = url.startsWith('http') ? url : `${AI_BASE_URL}${url}`
@@ -48,11 +56,12 @@ function aiRequest(options) {
 					raw: body,
 				})
 			},
-			fail: () => {
+			fail: (err) => {
+				const reason = err?.errMsg || err?.message || ''
 				resolve({
 					ok: false,
 					code: -1,
-					message: 'AI 服务连接失败',
+					message: reason ? `AI 服务连接失败：${reason}` : 'AI 服务连接失败',
 					data: null,
 					raw: null,
 				})
@@ -186,14 +195,21 @@ export function parseJD(jdText) {
 // ==================== Agent 接口 ====================
 
 /** 运行单个 Agent */
-export function runAgent(agentKey, extra = {}, sessionId = null) {
+export async function runAgent(agentKey, extra = {}, sessionId = null) {
 	const data = { extra }
 	if (sessionId) data.session_id = sessionId
-	return aiRequest({
+	const call = () => aiRequest({
 		url: `/agents/${agentKey}/run`,
 		method: 'POST',
 		data,
+		timeout: AI_AGENT_TIMEOUT,
 	})
+	let res = await call()
+	// 网络层失败（raw 为 null，说明请求没到后端）时自动重试一次
+	if (!res.ok && res.raw === null) {
+		res = await call()
+	}
+	return res
 }
 
 /** 运行完整流水线 */
@@ -204,6 +220,7 @@ export function runPipeline(fromAgent = null, extra = {}, sessionId = null) {
 		url: '/pipeline/run',
 		method: 'POST',
 		data,
+		timeout: AI_PIPELINE_TIMEOUT,
 	})
 }
 

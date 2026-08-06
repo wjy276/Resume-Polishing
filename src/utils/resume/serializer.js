@@ -59,6 +59,17 @@ function pickIfNonEmpty(obj, keys) {
 	return out
 }
 
+/** 限制 base64 图片大小，防止请求体过大导致后端读取超时 */
+const MAX_INLINE_PHOTO_BYTES = 100 * 1024 // 100KB
+function limitInlinePhoto(photo) {
+	if (!photo || typeof photo !== 'string' || !photo.startsWith('data:image')) return photo || ''
+	// base64 长度 ≈ 字节数 * 4/3，这里按字符长度快速估算
+	const approxBytes = Math.ceil((photo.length * 3) / 4)
+	if (approxBytes <= MAX_INLINE_PHOTO_BYTES) return photo
+	console.warn(`[serializer] 头像 base64 过大(${Math.round(approxBytes / 1024)}KB)，已移除内联图片，避免后端读取超时`)
+	return ''
+}
+
 // ─────────────────────────────────────────────────────────────
 // 前端 → 后端：toBackendPayload(resume)
 // ─────────────────────────────────────────────────────────────
@@ -481,7 +492,7 @@ export function toApiPayload(resume) {
 			birthDate: b.birthDate || '',
 			employementStatus: b.employementStatus || '',
 			employmentStatus: b.employementStatus || '',
-			photo: b.photo || '',
+			photo: limitInlinePhoto(b.photo),
 			layout: b.layout || 'left',
 			photoConfig: b.photoConfig || {},
 			fieldOrder: b.fieldOrder || [],
@@ -522,6 +533,61 @@ export function toApiPayload(resume) {
 			visible: it.visible === false ? 0 : 1,
 		})),
 		certificates,
+		skillContent: resume.skillContent || '',
+		selfEvaluationContent: resume.selfEvaluationContent || '',
+	}
+}
+
+/**
+ * 精简版前端简历 → PUT 请求体
+ * 当完整 payload 触发后端 500 时，尝试用最小字段集保存，
+ * 排除 customData / menuSections / globalSettings 等自由格式对象。
+ */
+export function toSafeApiPayload(resume) {
+	if (!resume) throw new Error('toSafeApiPayload: resume 不能为空')
+
+	const b = resume.basic || {}
+	return {
+		title: resume.title || '未命名简历',
+		activeSection: resume.activeSection || 'basic',
+		templateId: resume.templateId || 'classic',
+		basic: {
+			name: b.name || '',
+			title: b.title || '',
+			email: b.email || '',
+			phone: b.phone || '',
+			location: b.location || '',
+			birthDate: b.birthDate || '',
+			employementStatus: b.employementStatus || '',
+			employmentStatus: b.employementStatus || '',
+			photo: limitInlinePhoto(b.photo),
+			layout: b.layout || 'left',
+		},
+		experience: (resume.experience || []).map((it) => ({
+			company: it.company || '',
+			position: it.position || '',
+			dateRange: it.date || '',
+			details: it.details || '',
+			visible: it.visible === false ? 0 : 1,
+		})),
+		projects: (resume.projects || []).map((it) => ({
+			name: it.name || '',
+			role: it.role || '',
+			link: it.link || '',
+			dateRange: it.date || '',
+			description: it.description || '',
+			visible: it.visible === false ? 0 : 1,
+		})),
+		education: (resume.education || []).map((it) => ({
+			school: it.school || '',
+			major: it.major || '',
+			degree: it.degree || '',
+			startDate: it.startDate || '',
+			endDate: it.isCurrent ? '' : (it.endDate || ''),
+			current: !!it.isCurrent,
+			description: it.description || '',
+			visible: it.visible === false ? 0 : 1,
+		})),
 		skillContent: resume.skillContent || '',
 		selfEvaluationContent: resume.selfEvaluationContent || '',
 	}

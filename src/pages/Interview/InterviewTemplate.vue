@@ -362,6 +362,7 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .interview-main {
+	margin-left: var(--sidebar-width, 240px);
 	padding: 0;
 	overflow: hidden;
 	display: flex;

@@ -1,6 +1,11 @@
 <template>
 	<div class="section-panel">
-		<div v-for="(exp, idx) in list" :key="exp.id" class="item-card">
+		<div
+			v-for="(exp, idx) in list"
+			:key="exp.id"
+			class="item-card"
+			v-memo="[exp.id, exp.company, exp.position, exp.date, exp.details, expanded === exp.id, idx, list.length]"
+		>
 			<div class="item-card-header" @click="toggle(exp.id)">
 				<div class="card-header-left">
 					<span class="company-dot" />

@@ -295,10 +295,28 @@ const photoStyle = computed(() => {
 .rt-field-label { color: #6b7280; }
 
 /* ─── Section ─── */
-.rt-section { page-break-inside: avoid; }
+.rt-section {
+	page-break-inside: avoid;
+	/* 隔离非视口模块渲染，降低长简历预览的合成开销 */
+	content-visibility: auto;
+	contain-intrinsic-size: auto 120px;
+}
 .rt-section-title { margin: 0; }
 
-.rt-item { margin-bottom: 12px; page-break-inside: avoid; }
+.rt-item {
+	margin-bottom: 12px;
+	page-break-inside: avoid;
+	content-visibility: auto;
+	contain-intrinsic-size: auto 72px;
+}
+
+/* 打印时关闭渲染隔离，确保导出 PDF 不漏内容 */
+@media print {
+	.rt-section,
+	.rt-item {
+		content-visibility: visible;
+	}
+}
 
 .rt-item-head {
 	display: flex;

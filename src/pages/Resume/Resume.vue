@@ -41,11 +41,11 @@
 				<view class="ai-entry-left">
 					<view class="ai-entry-icon">✨</view>
 					<view class="ai-entry-content">
-						<text class="ai-entry-title">AI 智能优化</text>
-						<text class="ai-entry-desc">上传简历或新建 → 分析职业方向 → 匹配目标岗位 → 分模块优化</text>
+						<text class="ai-entry-title">求职意向</text>
+						<text class="ai-entry-desc">填写求职方向与目标岗位 JD，作为所有简历优化的提示词</text>
 					</view>
 				</view>
-				<button class="ai-entry-btn">开始优化</button>
+				<button class="ai-entry-btn">{{ careerIntentStore.isFilled ? '查看/修改' : '去填写' }}</button>
 			</view>
 
 			<view v-if="store.listLoading" class="loading-hint">
@@ -147,6 +147,13 @@
 			</view>
 		</view>
 	</view>
+
+	<!-- Career Intent Dialog (outside page-layout to avoid overflow:hidden clipping) -->
+	<CareerIntentDialog
+		:visible="showCareerIntentDialog"
+		@update:visible="showCareerIntentDialog = $event"
+		@saved="handleCareerIntentSaved"
+	/>
 </template>
 
 <script setup>
@@ -156,18 +163,22 @@ import Sidebar from '@/components/Sidebar/Sidebar.vue'
 import ClassicTemplate from '@/components/resume/ClassicTemplate.vue'
 import ResumeImportDialog from '@/components/ResumeImport/ResumeImportDialog.vue'
 import TemplateGallery from '@/components/TemplateGallery/TemplateGallery.vue'
+import CareerIntentDialog from '@/components/AIOptimize/CareerIntentDialog.vue'
 import { useResumeStore } from '@/stores/resume'
 import { useUserStore } from '@/stores/user'
 import { useAIOptimizeStore } from '@/stores/aiOptimize'
+import { useCareerIntentStore } from '@/stores/careerIntent'
 
 const store = useResumeStore()
 const userStore = useUserStore()
 const aiStore = useAIOptimizeStore()
+const careerIntentStore = useCareerIntentStore()
 const deleteTarget = ref(null)
 
 const showUpload = ref(false)
 const showImportDialog = ref(false)
 const showTemplateGallery = ref(false)
+const showCareerIntentDialog = ref(false)
 const selectedFile = ref(null)
 const uploading = ref(false)
 const isDragging = ref(false)
@@ -184,9 +195,24 @@ async function refreshList() {
 	await store.fetchAllFromServer()
 }
 
-onLoad(() => {
+onLoad(async () => {
 	refreshList()
+	await initCareerIntent()
 })
+
+async function initCareerIntent() {
+	const userInfo = userStore.userInfo
+	const userId = userInfo?.userId || userInfo?.id
+	if (userId) {
+		careerIntentStore.setUserId(String(userId))
+	}
+
+	await careerIntentStore.fetchCareerIntent(userId ? String(userId) : '')
+	if (careerIntentStore.isEmpty) {
+		// 未填写：首次进入自动弹出求职意向弹窗
+		showCareerIntentDialog.value = true
+	}
+}
 
 onShow(() => {
 	if (userStore.hasToken) refreshList()
@@ -322,25 +348,11 @@ function handleImported(resumeId) {
 }
 
 function goToAIOptimize() {
-	if (!isLoggedIn.value) {
-		uni.showToast({ title: '请先登录', icon: 'none' })
-		return
-	}
+	showCareerIntentDialog.value = true
+}
 
-	if (allResumes.value.length === 0) {
-		uni.showModal({
-			title: '提示',
-			content: '请先创建或上传一份简历，再进行 AI 优化',
-			confirmText: '新建简历',
-			success: (res) => {
-				if (res.confirm) createResume()
-			}
-		})
-		return
-	}
-
-	const firstResume = allResumes.value[0]
-	window.location.href = `/#/pages/Resume/ResumeEditor?id=${firstResume.id}&aiOptimize=1`
+function handleCareerIntentSaved() {
+	showCareerIntentDialog.value = false
 }
 </script>
 

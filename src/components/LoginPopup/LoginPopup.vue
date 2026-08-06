@@ -146,9 +146,9 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useUserStore } from '@/stores/user'
 
-// API 基础地址 - 通过 Vite 代理转发
-const BASE_URL = 'http://81.71.75.85:6008/api'
+const userStore = useUserStore()
 
 const props = defineProps({
 	visible: {
@@ -263,199 +263,7 @@ const validateForm = () => {
 	return !Object.values(errors.value).some(e => e)
 }
 
-/**
- * 登录接口
- * POST /api/v1/user/login
- */
-const loginApi = (data) => {
-	return new Promise((resolve, reject) => {
-		uni.request({
-			url: `${BASE_URL}/v1/user/login`,
-			method: 'POST',
-			data: {
-				username: data.username,
-				password: data.password
-			},
-			header: {
-				'Content-Type': 'application/json'
-			},
-			timeout: 10000, // 30秒超时
-
-			success: (res) => {
-				console.log('登录响应:', res)
-
-				// HTTP 状态码判断
-				if (res.statusCode === 200) {
-					const responseData = res.data
-
-					// 业务状态码判断
-					if (responseData.code === 0 || responseData.code === 200) {
-						resolve({
-							success: true,
-							data: responseData.data,
-							message: '登录成功'
-						})
-					} else {
-						// 业务错误
-						resolve({
-							success: false,
-							message: responseData.message || '登录失败，请检查用户名和密码'
-						})
-					}
-				} else if (res.statusCode === 400) {
-					resolve({
-						success: false,
-						message: '请求参数错误'
-					})
-				} else if (res.statusCode === 401) {
-					resolve({
-						success: false,
-						message: '用户名或密码错误'
-					})
-				} else if (res.statusCode === 500) {
-					resolve({
-						success: false,
-						message: '服务器错误，请稍后重试'
-					})
-				} else {
-					resolve({
-						success: false,
-						message: `请求失败(${res.statusCode})`
-					})
-				}
-			},
-			fail: (err) => {
-				console.error('登录请求失败:', err)
-
-				// 网络错误处理
-				let errorMessage = '网络错误，请检查网络连接'
-				if (err.errMsg) {
-					if (err.errMsg.includes('timeout')) {
-						errorMessage = '请求超时，请稍后重试'
-					} else if (err.errMsg.includes('network')) {
-						errorMessage = '网络连接失败，请检查网络'
-					} else if (err.errMsg.includes('abort')) {
-						errorMessage = '请求已取消'
-					}
-				}
-
-				resolve({
-					success: false,
-					message: errorMessage
-				})
-			}
-		})
-	})
-}
-
-/**
- * 注册接口
- * POST /api/v1/user/register
- */
-const registerApi = (data) => {
-	return new Promise((resolve, reject) => {
-		uni.request({
-			url: `${BASE_URL}/v1/user/register`,
-			method: 'POST',
-			data: {
-				username: data.username,
-				password: data.password,
-				email: data.email,
-				nickname: data.nickname
-			},
-			header: {
-				'Content-Type': 'application/json'
-			},
-			timeout: 15000,
-			success: (res) => {
-				console.log('注册响应:', res)
-
-				// HTTP 状态码判断
-				if (res.statusCode === 200) {
-					const responseData = res.data
-
-					// 业务状态码判断
-					if (responseData.code === 0 || responseData.code === 200) {
-						resolve({
-							success: true,
-							data: responseData.data,
-							message: '注册成功'
-						})
-					} else {
-						// 业务错误
-						resolve({
-							success: false,
-							message: responseData.message || '注册失败，请稍后重试'
-						})
-					}
-				} else if (res.statusCode === 400) {
-					const responseData = res.data
-					resolve({
-						success: false,
-						message: responseData.message || '请求参数错误，请检查输入信息'
-					})
-				} else if (res.statusCode === 409) {
-					resolve({
-						success: false,
-						message: '用户名或邮箱已被注册'
-					})
-				} else if (res.statusCode === 500) {
-					resolve({
-						success: false,
-						message: '服务器错误，请稍后重试'
-					})
-				} else {
-					resolve({
-						success: false,
-						message: `请求失败(${res.statusCode})`
-					})
-				}
-			},
-			fail: (err) => {
-				console.error('注册请求失败:', err)
-
-				// 网络错误处理
-				let errorMessage = '网络错误，请检查网络连接'
-				if (err.errMsg) {
-					if (err.errMsg.includes('timeout')) {
-						errorMessage = '请求超时，请稍后重试'
-					} else if (err.errMsg.includes('network')) {
-						errorMessage = '网络连接失败，请检查网络'
-					} else if (err.errMsg.includes('abort')) {
-						errorMessage = '请求已取消'
-					}
-				}
-
-				resolve({
-					success: false,
-					message: errorMessage
-				})
-			}
-		})
-	})
-}
-
-/**
- * 保存用户登录信息
- */
-const saveUserInfo = (data) => {
-	// 保存 token
-	if (data.token) {
-		uni.setStorageSync('token', data.token)
-	}
-
-	// 保存用户信息
-	const userInfo = {
-		userId: data.userId,
-		username: data.username,
-		nickname: data.nickname,
-		avatar: data.avatar,
-		remainingQuota: data.remainingQuota
-	}
-	uni.setStorageSync('userInfo', userInfo)
-}
-
-// 提交处理
+// 提交处理（统一走 userStore，登录状态全局化）
 const handleSubmit = async () => {
 	if (!validateForm() || isLoading.value) return
 
@@ -465,14 +273,14 @@ const handleSubmit = async () => {
 		let result
 
 		if (isLoginMode.value) {
-			// 登录
-			result = await loginApi({
+			// 登录：通过全局 store，token/userInfo 会自动写入 storage 和响应式状态
+			result = await userStore.login({
 				username: form.value.username,
 				password: form.value.password
 			})
 		} else {
 			// 注册
-			result = await registerApi({
+			result = await userStore.register({
 				username: form.value.username,
 				password: form.value.password,
 				email: form.value.email,
@@ -486,11 +294,6 @@ const handleSubmit = async () => {
 				icon: 'success',
 				duration: 1500
 			})
-
-			// 登录成功保存用户信息
-			if (isLoginMode.value && result.data) {
-				saveUserInfo(result.data)
-			}
 
 			// 记住用户名
 			if (isLoginMode.value && rememberMe.value) {

@@ -182,6 +182,7 @@ const goToInterview = () => {
 
 <style scoped lang="scss">
 .home-main {
+	margin-left: var(--sidebar-width, 240px);
 	padding: 24px 32px 40px;
 }
 

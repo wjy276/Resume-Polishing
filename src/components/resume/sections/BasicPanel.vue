@@ -194,11 +194,53 @@ function choosePhoto() {
 	input.onchange = (e) => {
 		const file = e.target.files?.[0]
 		if (!file) return
-		const reader = new FileReader()
-		reader.onload = (ev) => { basic.value.photo = ev.target.result }
-		reader.readAsDataURL(file)
+		_compressPhoto(file, 320, 0.8, 100 * 1024).then((base64) => {
+			basic.value.photo = base64
+		}).catch(() => {
+			// 压缩失败时回退到原图
+			const reader = new FileReader()
+			reader.onload = (ev) => { basic.value.photo = ev.target.result }
+			reader.readAsDataURL(file)
+		})
 	}
 	input.click()
+}
+
+/**
+ * 压缩头像图片，避免 base64 过大导致保存超时
+ * @param {File} file
+ * @param {number} maxWidth 最大宽度
+ * @param {number} quality 压缩质量 0-1
+ * @param {number} maxBytes 超过该字节数继续降低质量
+ */
+function _compressPhoto(file, maxWidth = 320, quality = 0.8, maxBytes = 100 * 1024) {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader()
+		reader.onload = (ev) => {
+			const img = new Image()
+			img.onload = () => {
+				const canvas = document.createElement('canvas')
+				const ratio = Math.min(maxWidth / img.width, 1)
+				canvas.width = Math.round(img.width * ratio)
+				canvas.height = Math.round(img.height * ratio)
+				const ctx = canvas.getContext('2d')
+				ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+				let q = quality
+				let base64 = canvas.toDataURL('image/jpeg', q)
+				// 若仍超过阈值，逐步降低质量
+				while (base64.length > maxBytes * 1.37 && q > 0.3) {
+					q -= 0.1
+					base64 = canvas.toDataURL('image/jpeg', q)
+				}
+				resolve(base64)
+			}
+			img.onerror = reject
+			img.src = ev.target.result
+		}
+		reader.onerror = reject
+		reader.readAsDataURL(file)
+	})
 }
 
 function addCustomField() {

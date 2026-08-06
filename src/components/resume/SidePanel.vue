@@ -13,7 +13,18 @@
 					v-for="(section, index) in menuSections"
 					:key="section.id"
 					class="module-item"
-					:class="{ active: activeSection === section.id, disabled: !section.enabled }"
+					:class="{
+						active: activeSection === section.id,
+						disabled: !section.enabled,
+						dragging: draggingIndex === index,
+						'drop-target': dropIndex === index && draggingIndex !== null,
+					}"
+					draggable="true"
+					@dragstart="onDragStart(index, $event)"
+					@dragend="onDragEnd"
+					@dragover.prevent="onDragOver(index)"
+					@dragleave="onDragLeave(index)"
+					@drop="onDrop(index, $event)"
 					@click="selectSection(section.id)"
 				>
 					<span class="drag-handle" title="拖拽排序">⠿</span>
@@ -53,6 +64,62 @@
 						<div v-if="!availableModules.length" class="add-popup-empty">暂无可添加模块</div>
 					</div>
 				</transition>
+			</div>
+		</div>
+
+		<!-- ── 求职意向 ── -->
+		<div class="panel-card">
+			<div class="card-header">
+				<svg class="card-svg-icon" viewBox="0 0 16 16" fill="none"><path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+				<span class="card-title">求职意向</span>
+			</div>
+			<div class="career-intent-body">
+				<div class="intent-row">
+					<span class="intent-label">目标岗位</span>
+					<input
+						class="intent-input"
+						:value="careerIntent.targetRole"
+						@input="e => updateCareerIntent({ targetRole: e.detail?.value ?? e.target?.value })"
+						placeholder="目标岗位"
+					/>
+				</div>
+				<div class="intent-row">
+					<span class="intent-label">工作年限</span>
+					<input
+						class="intent-input"
+						:value="careerIntent.experienceYear"
+						@input="e => updateCareerIntent({ experienceYear: e.detail?.value ?? e.target?.value })"
+						placeholder="应届生 / 1-3年"
+					/>
+				</div>
+				<div class="intent-row">
+					<span class="intent-label">目标城市</span>
+					<input
+						class="intent-input"
+						:value="careerIntent.targetCities"
+						@input="e => updateCareerIntent({ targetCities: e.detail?.value ?? e.target?.value })"
+						placeholder="北京, 上海"
+					/>
+				</div>
+				<div class="intent-row">
+					<span class="intent-label">核心技能</span>
+					<input
+						class="intent-input"
+						:value="careerIntent.coreSkills"
+						@input="e => updateCareerIntent({ coreSkills: e.detail?.value ?? e.target?.value })"
+						placeholder="Java, Spring Boot"
+					/>
+				</div>
+				<div class="intent-row vertical">
+					<span class="intent-label">补充信息</span>
+					<textarea
+						class="intent-textarea"
+						:value="careerIntent.extraInfo"
+						@input="e => updateCareerIntent({ extraInfo: e.detail?.value ?? e.target?.value })"
+						placeholder="项目亮点、期望行业等"
+						rows="2"
+					></textarea>
+				</div>
 			</div>
 		</div>
 
@@ -228,9 +295,22 @@ import { normalizeMenuSection, mergeMenuSections } from '@/utils/resume/serializ
 
 const store = useResumeStore()
 const showAddPopup = ref(false)
+const draggingIndex = ref(null)
+const dropIndex = ref(null)
 
 const gs = computed(() => store.activeResume?.globalSettings || {})
+const careerIntent = computed(() => store.activeResume?.customData?.careerIntent || {
+	targetRole: '',
+	experienceYear: '',
+	targetCities: '',
+	coreSkills: '',
+	extraInfo: ''
+})
 const themeColor = computed(() => gs.value.themeColor || '#000000')
+
+function updateCareerIntent(partial) {
+	store.updateCareerIntent(partial)
+}
 // 仅展示简历已有的模块（不补全默认列表），让「添加模块」弹窗负责提供未添加的模块
 const menuSections = computed(() => {
 	const sections = store.activeResume?.menuSections || []
@@ -278,6 +358,36 @@ function toggleVisibility(id) { store.toggleSectionVisibility(id) }
 function moveUp(i) { store.reorderSections(i, i - 1) }
 function moveDown(i) { store.reorderSections(i, i + 1) }
 
+function onDragStart(index, e) {
+	draggingIndex.value = index
+	if (e.dataTransfer) {
+		e.dataTransfer.effectAllowed = 'move'
+		e.dataTransfer.setData('text/plain', String(index))
+	}
+}
+
+function onDragEnd() {
+	draggingIndex.value = null
+	dropIndex.value = null
+}
+
+function onDragOver(index) {
+	if (dropIndex.value !== index) dropIndex.value = index
+}
+
+function onDragLeave(index) {
+	if (dropIndex.value === index) dropIndex.value = null
+}
+
+function onDrop(index, e) {
+	e.preventDefault()
+	const from = draggingIndex.value
+	draggingIndex.value = null
+	dropIndex.value = null
+	if (from === null || from === index) return
+	store.reorderSections(from, index)
+}
+
 function addSection(mod) {
 	store.updateMenuSections([...menuSections.value, {
 		id: mod.id, title: mod.title, icon: mod.icon, enabled: true, order: menuSections.value.length,
@@ -309,7 +419,7 @@ function update(partial) { store.updateGlobalSettings(partial) }
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
-	background: #fafafa;
+	background: var(--bg-card);
 	scrollbar-width: thin;
 	scrollbar-color: var(--border-color) transparent;
 	
@@ -392,6 +502,7 @@ function update(partial) { store.updateGlobalSettings(partial) }
 	cursor: pointer;
 	transition: all var(--transition-fast);
 	min-width: 0;
+	position: relative;
 
 	&:hover { 
 		background: var(--bg-page); 
@@ -406,6 +517,21 @@ function update(partial) { store.updateGlobalSettings(partial) }
 	}
 
 	&.disabled .module-title { color: var(--text-muted); }
+
+	&.dragging {
+		opacity: 0.9;
+		transform: scale(1.02) rotate(1deg);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+		z-index: 100;
+		transition: transform 150ms ease, box-shadow 150ms ease;
+		background: var(--bg-card);
+	}
+
+	&.drop-target {
+		outline: 2px dashed var(--color-accent-primary);
+		outline-offset: -2px;
+		background: var(--color-accent-subtle);
+	}
 }
 
 .drag-handle {
@@ -881,5 +1007,59 @@ input[type="range"] {
 	&:hover .track {
 		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 	}
+}
+
+/* Career Intent */
+.career-intent-body {
+	padding: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.intent-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+
+	&.vertical {
+		flex-direction: column;
+		align-items: stretch;
+		gap: 4px;
+	}
+}
+
+.intent-label {
+	font-size: 12px;
+	color: var(--text-muted);
+	flex-shrink: 0;
+	width: 56px;
+}
+
+.intent-input,
+.intent-textarea {
+	flex: 1;
+	min-width: 0;
+	padding: 6px 8px;
+	border: 1px solid var(--border-color);
+	border-radius: 6px;
+	font-size: 12px;
+	background: var(--bg-card);
+	color: var(--text-primary);
+	outline: none;
+	transition: border-color 0.15s;
+
+	&:focus {
+		border-color: var(--primary-light);
+	}
+
+	&::placeholder {
+		color: var(--text-muted);
+	}
+}
+
+.intent-textarea {
+	resize: vertical;
+	min-height: 48px;
 }
 </style>

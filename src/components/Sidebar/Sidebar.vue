@@ -53,15 +53,17 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import LoginPopup from '@/components/LoginPopup/LoginPopup.vue'
+import { useUserStore } from '@/stores/user'
 import { DEFAULT_AVATAR, resolveAvatar } from '@/utils/avatar'
+
+// 全局登录状态
+const userStore = useUserStore()
+const { isLogin, userInfo } = storeToRefs(userStore)
 
 // 登录弹窗状态
 const showLoginPopup = ref(false)
-
-// 登录状态
-const isLogin = ref(false)
-const userInfo = ref(null)
 
 // 导航菜单配置
 const menuItems = ref([
@@ -112,20 +114,6 @@ function onAvatarError() {
 	avatarLoadFailed.value = true
 }
 
-// 检查登录状态
-const checkLoginStatus = () => {
-	const token = uni.getStorageSync('token')
-	const storedUserInfo = uni.getStorageSync('userInfo')
-
-	if (token && storedUserInfo) {
-		isLogin.value = true
-		userInfo.value = storedUserInfo
-	} else {
-		isLogin.value = false
-		userInfo.value = null
-	}
-}
-
 // 页面映射
 const pageMap = {
 	home: '/#/pages/Home/Home',
@@ -140,17 +128,26 @@ const navigate = (pageId) => {
 	if (currentPage.value === pageId) return
 
 	const url = pageMap[pageId]
-	if (url) {
-		// 添加淡入动画类
-		document.body.classList.add('page-transitioning')
+	if (!url) return
+
+	// 支持时优先使用 View Transition API，否则回退到淡入动画
+	const doNav = () => {
+		window.location.href = url
 		setTimeout(() => {
-			window.location.href = url
-		}, 50)
+			document.body.classList.remove('page-transitioning')
+		}, 350)
+	}
+
+	document.body.classList.add('page-transitioning')
+	if (typeof document !== 'undefined' && document.startViewTransition) {
+		setTimeout(() => document.startViewTransition(doNav), 50)
+	} else {
+		setTimeout(doNav, 50)
 	}
 }
 
 // 点击设置图标
-const handleSettingsClick = (e) => {
+const handleSettingsClick = async (e) => {
 	if (e) e.stopPropagation()
 	if (!isLogin.value) return
 
@@ -163,12 +160,9 @@ const handleSettingsClick = (e) => {
 					content: '确定要退出登录吗？',
 					confirmText: '确定',
 					cancelText: '取消',
-					success: (modalRes) => {
+					success: async (modalRes) => {
 						if (modalRes.confirm) {
-							uni.removeStorageSync('token')
-							uni.removeStorageSync('userInfo')
-							isLogin.value = false
-							userInfo.value = null
+							await userStore.logout()
 							uni.showToast({ title: '已退出登录', icon: 'success' })
 							setTimeout(() => {
 								window.location.href = '/#/pages/Home/Home'
@@ -190,14 +184,14 @@ const handleUserClick = () => {
 	}
 }
 
-// 登录成功回调
+// 登录成功回调（LoginPopup 内部已通过 userStore 更新全局状态，这里只需关闭弹窗）
 const handleLoginSuccess = () => {
-	checkLoginStatus()
+	showLoginPopup.value = false
 }
 
-// 组件挂载时检查登录状态
+// 组件挂载时同步 store 与 storage
 onMounted(() => {
-	checkLoginStatus()
+	userStore.checkLogin()
 })
 </script>
 

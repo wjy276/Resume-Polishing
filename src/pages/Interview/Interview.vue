@@ -1,149 +1,169 @@
-<!-- 面包屑：面试模拟 -->
+<!-- 模拟面试 -->
+<!-- 按设计规范优化 UI，保持原有功能不变 -->
 
 <template>
 	<view class="page-layout">
 		<Sidebar />
 		<view class="page-main interview-main">
-			<!-- 顶部 -->
-			<view class="title-row">
-				<view>
-					<text class="page-title">模拟面试</text>
-					<text class="page-subtitle">AI 模拟真实面试场景，提升面试技巧，增强自信心</text>
-				</view>
-			</view>
-
-			<!-- 面试模式 -->
-			<view class="mode-section">
-				<view
-					class="mode-card"
-					:class="{ active: currentMode === 'technical' }"
-					@click="selectMode('technical')"
-					:style="{ animationDelay: '0ms' }"
-				>
-					<view class="mode-icon-wrapper">
-						<text class="mode-icon">💻</text>
+			<view class="interview-page-wrapper">
+				<!-- 顶部导航栏 -->
+				<view class="top-nav">
+					<view class="search-box">
+						<text class="search-icon">🔍</text>
+						<input class="search-input" placeholder="搜索面试类型、岗位..." />
 					</view>
-					<text class="mode-title">技术面试</text>
-					<text class="mode-desc">前端、后端、算法等技术问题</text>
-					<view class="mode-tag" v-if="currentMode === 'technical'">
-						<text class="tag-text">已选择</text>
-					</view>
-					<view class="mode-check" v-if="currentMode === 'technical'">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-							<path d="M5 12l5 5L20 7" />
-						</svg>
-					</view>
-				</view>
-
-				<view
-					class="mode-card"
-					:class="{ active: currentMode === 'hr' }"
-					@click="selectMode('hr')"
-					:style="{ animationDelay: '100ms' }"
-				>
-					<view class="mode-icon-wrapper">
-						<text class="mode-icon">👥</text>
-					</view>
-					<text class="mode-title">HR 面试</text>
-					<text class="mode-desc">行为问题、职业规划等</text>
-					<view class="mode-tag" v-if="currentMode === 'hr'">
-						<text class="tag-text">已选择</text>
-					</view>
-					<view class="mode-check" v-if="currentMode === 'hr'">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-							<path d="M5 12l5 5L20 7" />
-						</svg>
-					</view>
-				</view>
-
-				<view
-					class="mode-card"
-					:class="{ active: currentMode === 'project' }"
-					@click="selectMode('project')"
-					:style="{ animationDelay: '200ms' }"
-				>
-					<view class="mode-icon-wrapper">
-						<text class="mode-icon">📊</text>
-					</view>
-					<text class="mode-title">项目面</text>
-					<text class="mode-desc">项目经验、技术深度探讨</text>
-					<view class="mode-tag" v-if="currentMode === 'project'">
-						<text class="tag-text">已选择</text>
-					</view>
-					<view class="mode-check" v-if="currentMode === 'project'">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-							<path d="M5 12l5 5L20 7" />
-						</svg>
-					</view>
-				</view>
-			</view>
-
-			<!-- 面试记录 -->
-			<view class="interview-records">
-				<view class="section-header">
-					<text class="section-title">最近面试记录</text>
-					<text class="section-more" @click="viewAllRecords">查看全部 →</text>
-				</view>
-				<view class="record-list">
-					<view 
-						class="record-item" 
-						v-for="(record, index) in recordList" 
-						:key="record.id"
-						:style="{ animationDelay: `${index * 100}ms` }"
-					>
-						<view class="record-header">
-							<view class="record-title-wrapper">
-								<text class="record-title">{{ record.title }}</text>
-							</view>
-							<view class="record-score-wrapper">
-								<text class="record-score">{{ record.score }}</text>
-								<text class="score-label">分</text>
-							</view>
+					<view class="nav-right">
+						<view class="notification-bell">
+							<text class="bell-icon">🔔</text>
+							<text class="badge">3</text>
 						</view>
-						<view class="record-info">
-							<view class="info-item">
-								<text class="info-icon">📅</text>
-								<text class="record-date">{{ record.date }}</text>
-							</view>
-							<view class="info-item">
-								<text class="info-icon">⏱</text>
-								<text class="record-duration">{{ record.duration }}分钟</text>
-							</view>
-						</view>
-						<view class="record-tags">
-							<view class="record-tag" v-for="tag in record.tags" :key="tag">{{ tag }}</view>
-						</view>
-						<view class="record-progress">
-							<view class="progress-bar">
-								<view class="progress-fill" :style="{ width: `${record.score}%` }"></view>
-							</view>
+						<view class="avatar-dropdown">
+							<image
+								class="nav-avatar"
+								:src="displayAvatar"
+								mode="aspectFill"
+								@error="avatarLoadFailed = true"
+							/>
+							<text class="dropdown-arrow">▼</text>
 						</view>
 					</view>
 				</view>
-			</view>
 
-			<!-- 开始按钮 -->
-			<view class="start-section">
-				<button class="start-btn" @click="startInterview">
-					<view class="btn-icon-wrapper">
-						<text class="btn-icon">🎯</text>
+				<!-- 主内容区 -->
+				<view class="content-area">
+					<!-- 页面标题 -->
+					<view class="title-row">
+						<text class="page-title">模拟面试</text>
+						<text class="page-subtitle">AI语音对话模拟真实面试场景</text>
 					</view>
-					<text class="btn-text">开始面试</text>
-					<view class="btn-arrow">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-							<path d="M5 12h14M12 5l7 7-7 7" />
-						</svg>
+
+					<!-- 面试类型卡片 -->
+					<view class="mode-section">
+						<view
+							class="mode-card"
+							:class="{ active: currentMode === 'technical' }"
+							@click="selectMode('technical')"
+						>
+							<view class="mode-icon-wrapper blue">
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+								</svg>
+							</view>
+							<text class="mode-title">技术面试</text>
+							<text class="mode-desc">前端、后端、算法等技术问题</text>
+							<view class="mode-tags">
+								<view class="mode-tag">Vue</view>
+								<view class="mode-tag">React</view>
+								<view class="mode-tag">算法</view>
+							</view>
+						</view>
+
+						<view
+							class="mode-card"
+							:class="{ active: currentMode === 'hr' }"
+							@click="selectMode('hr')"
+						>
+							<view class="mode-icon-wrapper purple">
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+									<circle cx="9" cy="7" r="4"></circle>
+									<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+									<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+								</svg>
+							</view>
+							<text class="mode-title">HR 面试</text>
+							<text class="mode-desc">行为问题、职业规划等</text>
+							<view class="mode-tags">
+								<view class="mode-tag">自我介绍</view>
+								<view class="mode-tag">职业规划</view>
+							</view>
+						</view>
+
+						<view
+							class="mode-card"
+							:class="{ active: currentMode === 'project' }"
+							@click="selectMode('project')"
+						>
+							<view class="mode-icon-wrapper orange">
+								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+									<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+								</svg>
+							</view>
+							<text class="mode-title">项目面</text>
+							<text class="mode-desc">项目经验、技术深度探讨</text>
+							<view class="mode-tags">
+								<view class="mode-tag">项目复盘</view>
+								<view class="mode-tag">技术难点</view>
+							</view>
+						</view>
 					</view>
-				</button>
-				<text class="start-hint">AI 将根据您的简历智能生成面试问题</text>
+
+					<!-- CTA Banner -->
+					<view class="cta-banner">
+						<view class="cta-left">
+							<text class="cta-title">准备好了吗？</text>
+							<text class="cta-desc">AI 将根据您的简历智能生成面试问题，现在开始模拟真实面试场景</text>
+						</view>
+						<view class="cta-btn" @click="startInterview">
+							<text class="cta-btn-icon">📞</text>
+							<text class="cta-btn-text">开始面试</text>
+						</view>
+					</view>
+
+					<!-- 历史记录 -->
+					<view class="records-section">
+						<view class="section-header">
+							<view class="section-title-wrapper">
+								<text class="section-icon">🕐</text>
+								<text class="section-title">历史记录</text>
+							</view>
+							<text class="section-more" @click="viewAllRecords">查看全部 →</text>
+						</view>
+
+						<view class="record-list">
+							<view
+								class="record-item"
+								v-for="(record, index) in recordList"
+								:key="record.id"
+								:style="{ animationDelay: `${index * 80}ms` }"
+							>
+								<view class="record-left">
+									<view class="record-icon-wrapper">
+										<text class="record-icon">💬</text>
+									</view>
+									<view class="record-info">
+										<text class="record-title">{{ record.title }}</text>
+										<text class="record-meta">{{ record.date }} · {{ record.duration }}分钟</text>
+									</view>
+								</view>
+								<view class="record-right">
+									<view class="record-score">
+										<text class="score-number" :class="scoreClass(record.score)">{{ record.score }}</text>
+										<text class="score-label">综合评分</text>
+									</view>
+									<view class="detail-btn" @click.stop="viewRecord(record)">查看详情</view>
+								</view>
+							</view>
+						</view>
+					</view>
+				</view>
 			</view>
 		</view>
 	</view>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import Sidebar from '@/components/Sidebar/Sidebar.vue'
+import { useUserStore } from '@/stores/user'
+import { DEFAULT_AVATAR, resolveAvatar } from '@/utils/avatar'
+
+const userStore = useUserStore()
+const avatarLoadFailed = ref(false)
+
+const displayAvatar = computed(() =>
+	avatarLoadFailed.value ? DEFAULT_AVATAR : resolveAvatar(userStore.isLogin ? userStore.userInfo?.avatar : '')
+)
 
 const currentMode = ref('technical')
 
@@ -152,30 +172,33 @@ const recordList = ref([
 		id: 1,
 		title: '前端高级开发工程师 - 技术面',
 		score: 88,
-		date: '2024-03-20',
-		duration: 25,
-		tags: ['Vue', 'JavaScript', '性能优化']
+		date: '2024年3月20日',
+		duration: 25
 	},
 	{
 		id: 2,
 		title: '产品经理 - 业务面',
 		score: 82,
-		date: '2024-03-18',
-		duration: 30,
-		tags: ['产品设计', '数据分析', '用户研究']
+		date: '2024年3月18日',
+		duration: 30
 	},
 	{
 		id: 3,
 		title: '全栈工程师 - 综合面',
 		score: 90,
-		date: '2024-03-15',
-		duration: 35,
-		tags: ['React', 'Node.js', '数据库']
+		date: '2024年3月15日',
+		duration: 35
 	}
 ])
 
 const selectMode = (mode) => {
 	currentMode.value = mode
+}
+
+const scoreClass = (score) => {
+	if (score >= 90) return 'high'
+	if (score >= 85) return 'medium'
+	return 'low'
 }
 
 const startInterview = () => {
@@ -185,16 +208,161 @@ const startInterview = () => {
 const viewAllRecords = () => {
 	// 查看全部记录
 }
+
+const viewRecord = (record) => {
+	uni.showToast({ title: `查看记录: ${record.title}`, icon: 'none' })
+}
 </script>
 
 <style scoped lang="scss">
+// 设计规范色值（仅本页使用）
+$sidebar-bg: #1e3a5f;
+$content-bg: #f0f2f5;
+$card-bg: #ffffff;
+$title-color: #1a1a2e;
+$subtitle-color: #6b7280;
+$muted-color: #9ca3af;
+$primary-blue: #3b82f6;
+$primary-purple: #a855f7;
+$primary-orange: #ef4444;
+$cta-gradient: linear-gradient(135deg, #1e3a5f 0%, #0ea5e9 100%);
+$score-high: #10b981;
+$score-medium: #3b82f6;
+$score-low: #f59e0b;
+$border-color: #e5e7eb;
+
 .interview-main {
-	padding: var(--spacing-xl) var(--spacing-2xl) var(--spacing-3xl);
+	margin-left: var(--sidebar-width, 240px);
+	padding: 0;
+	background: $content-bg;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+.interview-page-wrapper {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+/* ── 顶部导航栏 ── */
+.top-nav {
+	height: 56px;
+	background: $card-bg;
+	border-bottom: 1px solid $border-color;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0 24px;
+	flex-shrink: 0;
+}
+
+.search-box {
+	width: 360px;
+	height: 36px;
+	background: #f3f4f6;
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	padding: 0 12px;
+	gap: 8px;
+
+	.search-icon {
+		font-size: 14px;
+		color: $muted-color;
+	}
+
+	.search-input {
+		flex: 1;
+		border: none;
+		background: transparent;
+		font-size: 14px;
+		color: $title-color;
+		outline: none;
+
+		&::placeholder {
+			color: $muted-color;
+		}
+	}
+}
+
+.nav-right {
+	display: flex;
+	align-items: center;
+	gap: 20px;
+}
+
+.notification-bell {
+	position: relative;
+	cursor: pointer;
+
+	.bell-icon {
+		font-size: 18px;
+	}
+
+	.badge {
+		position: absolute;
+		top: -6px;
+		right: -6px;
+		min-width: 16px;
+		height: 16px;
+		background: #ef4444;
+		color: #fff;
+		font-size: 10px;
+		border-radius: 8px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0 4px;
+	}
+}
+
+.avatar-dropdown {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+
+	.nav-avatar {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		object-fit: cover;
+	}
+
+	.dropdown-arrow {
+		font-size: 10px;
+		color: $muted-color;
+	}
+}
+
+/* ── 主内容区 ── */
+.content-area {
+	flex: 1;
+	overflow-y: auto;
+	padding: 24px;
+	max-width: 1248px;
 }
 
 .title-row {
-	margin-bottom: var(--spacing-lg);
+	margin-bottom: 24px;
 	animation: slideDown 0.5s ease;
+}
+
+.page-title {
+	font-size: 24px;
+	font-weight: 700;
+	color: $title-color;
+	display: block;
+}
+
+.page-subtitle {
+	font-size: 14px;
+	color: $subtitle-color;
+	display: block;
+	margin-top: 8px;
 }
 
 @keyframes slideDown {
@@ -208,66 +376,40 @@ const viewAllRecords = () => {
 	}
 }
 
-.page-title {
-	font-size: var(--font-size-3xl);
-	font-weight: var(--font-weight-bold);
-	color: var(--text-primary);
-	display: block;
-	letter-spacing: -0.5px;
-}
-
-.page-subtitle {
-	font-size: var(--font-size-base);
-	color: var(--text-secondary);
-	display: block;
-	margin-top: var(--spacing-xs);
-}
-
+/* ── 面试类型卡片 ── */
 .mode-section {
 	display: grid;
 	grid-template-columns: repeat(3, 1fr);
-	gap: var(--spacing-lg);
-	margin-bottom: var(--spacing-2xl);
+	gap: 20px;
+	margin-bottom: 24px;
 }
 
 .mode-card {
-	background: var(--bg-card);
-	padding: var(--spacing-xl) var(--spacing-lg);
-	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-sm);
-	border: 2px solid transparent;
+	background: $card-bg;
+	border-radius: 12px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+	padding: 24px;
+	min-height: 180px;
 	cursor: pointer;
-	transition: all var(--transition-normal);
-	position: relative;
-	text-align: center;
+	transition: all 0.25s;
+	border: 2px solid transparent;
 	animation: slideUp 0.5s ease backwards;
 
 	&:hover {
-		transform: translateY(-6px);
-		box-shadow: var(--shadow-lg);
-		border-color: rgba(59, 130, 246, 0.2);
+		transform: translateY(-4px);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
 	}
 
 	&.active {
-		border-color: var(--primary-light);
-		background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-		box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15), var(--shadow-md);
-
-		.mode-icon-wrapper {
-			transform: scale(1.1);
-			background: linear-gradient(135deg, var(--primary-light), #06b6d4);
-		}
-
-		.mode-title {
-			color: var(--primary-light);
-		}
+		border-color: $primary-blue;
+		box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
 	}
 }
 
 @keyframes slideUp {
 	from {
 		opacity: 0;
-		transform: translateY(30px);
+		transform: translateY(20px);
 	}
 	to {
 		opacity: 1;
@@ -276,155 +418,192 @@ const viewAllRecords = () => {
 }
 
 .mode-icon-wrapper {
-	width: 72px;
-	height: 72px;
-	background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
-	border-radius: var(--radius-xl);
+	width: 48px;
+	height: 48px;
+	border-radius: 10px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	margin: 0 auto var(--spacing-md);
-	transition: all var(--transition-normal);
-}
+	margin-bottom: 16px;
+	color: #fff;
 
-.mode-icon {
-	font-size: 36px;
-	display: block;
+	svg {
+		width: 24px;
+		height: 24px;
+	}
+
+	&.blue {
+		background: $primary-blue;
+	}
+
+	&.purple {
+		background: $primary-purple;
+	}
+
+	&.orange {
+		background: $primary-orange;
+	}
 }
 
 .mode-title {
-	font-size: var(--font-size-lg);
-	font-weight: var(--font-weight-semibold);
-	color: var(--text-primary);
+	font-size: 16px;
+	font-weight: 700;
+	color: $title-color;
 	display: block;
-	margin-bottom: var(--spacing-xs);
-	transition: color var(--transition-fast);
+	margin-bottom: 4px;
 }
 
 .mode-desc {
-	font-size: var(--font-size-sm);
-	color: var(--text-secondary);
+	font-size: 13px;
+	color: $subtitle-color;
 	display: block;
-	margin-bottom: var(--spacing-sm);
+	margin-bottom: 12px;
 	line-height: 1.5;
 }
 
+.mode-tags {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
 .mode-tag {
-	background: linear-gradient(135deg, var(--primary-light), #06b6d4);
-	color: #fff;
-	padding: 4px 14px;
-	border-radius: var(--radius-full);
-	font-size: var(--font-size-xs);
-	font-weight: var(--font-weight-medium);
-	position: absolute;
-	top: var(--spacing-md);
-	right: var(--spacing-md);
-	box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-	animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-	from {
-		opacity: 0;
-		transform: scale(0.8);
-	}
-	to {
-		opacity: 1;
-		transform: scale(1);
-	}
-}
-
-.tag-text {
-	display: block;
-}
-
-.mode-check {
-	position: absolute;
-	bottom: var(--spacing-md);
-	right: var(--spacing-md);
-	width: 24px;
 	height: 24px;
-	background: var(--primary-light);
-	border-radius: 50%;
+	padding: 0 10px;
+	background: #f3f4f6;
+	color: $subtitle-color;
+	font-size: 12px;
+	border-radius: 12px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
+}
+
+/* ── CTA Banner ── */
+.cta-banner {
+	background: $cta-gradient;
+	border-radius: 12px;
+	padding: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 24px;
+	animation: fadeIn 0.5s ease 0.2s backwards;
+}
+
+@keyframes fadeIn {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+.cta-left {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.cta-title {
+	font-size: 20px;
+	font-weight: 700;
 	color: #fff;
-	animation: scaleIn 0.3s ease;
+}
 
-	svg {
-		width: 14px;
-		height: 14px;
+.cta-desc {
+	font-size: 14px;
+	color: rgba(255, 255, 255, 0.85);
+}
+
+.cta-btn {
+	height: 40px;
+	padding: 0 20px;
+	background: #fff;
+	color: $sidebar-bg;
+	border-radius: 8px;
+	font-size: 14px;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	transition: all 0.2s;
+	flex-shrink: 0;
+
+	&:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 	}
 }
 
-@keyframes scaleIn {
-	from {
-		transform: scale(0);
-	}
-	to {
-		transform: scale(1);
-	}
+.cta-btn-icon {
+	font-size: 14px;
 }
 
-.interview-records {
-	margin-bottom: var(--spacing-2xl);
+/* ── 历史记录 ── */
+.records-section {
+	animation: slideUp 0.5s ease 0.3s backwards;
 }
 
 .section-header {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: var(--spacing-md);
+	margin-bottom: 16px;
+}
+
+.section-title-wrapper {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.section-icon {
+	font-size: 16px;
+	color: $muted-color;
 }
 
 .section-title {
-	font-size: var(--font-size-xl);
-	font-weight: var(--font-weight-bold);
-	color: var(--text-primary);
-	display: block;
+	font-size: 16px;
+	font-weight: 700;
+	color: $title-color;
 }
 
 .section-more {
-	font-size: var(--font-size-sm);
-	color: var(--primary-light);
+	font-size: 13px;
+	color: $subtitle-color;
 	cursor: pointer;
-	transition: all var(--transition-fast);
-	padding: var(--spacing-xs) var(--spacing-sm);
-	border-radius: var(--radius-md);
 
 	&:hover {
-		background: rgba(59, 130, 246, 0.1);
-		transform: translateX(4px);
+		color: $primary-blue;
 	}
 }
 
 .record-list {
 	display: flex;
 	flex-direction: column;
-	gap: var(--spacing-md);
+	gap: 8px;
 }
 
 .record-item {
-	background: var(--bg-card);
-	padding: var(--spacing-lg);
-	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-sm);
-	border: 1px solid var(--border-color);
-	transition: all var(--transition-normal);
+	background: $card-bg;
+	border-radius: 8px;
+	padding: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	cursor: pointer;
+	transition: all 0.2s;
 	animation: slideInRight 0.5s ease backwards;
 
 	&:hover {
-		box-shadow: var(--shadow-md);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 		transform: translateX(4px);
-		border-color: rgba(59, 130, 246, 0.2);
 	}
 }
 
 @keyframes slideInRight {
 	from {
 		opacity: 0;
-		transform: translateX(-30px);
+		transform: translateX(-20px);
 	}
 	to {
 		opacity: 1;
@@ -432,256 +611,128 @@ const viewAllRecords = () => {
 	}
 }
 
-.record-header {
+.record-left {
 	display: flex;
-	justify-content: space-between;
-	align-items: flex-start;
-	margin-bottom: var(--spacing-sm);
+	align-items: center;
+	gap: 12px;
 }
 
-.record-title-wrapper {
-	flex: 1;
-	margin-right: var(--spacing-md);
-}
-
-.record-title {
-	font-size: var(--font-size-base);
-	font-weight: var(--font-weight-semibold);
-	color: var(--text-primary);
-	line-height: 1.4;
-}
-
-.record-score-wrapper {
+.record-icon-wrapper {
+	width: 40px;
+	height: 40px;
+	background: #f3f4f6;
+	border-radius: 8px;
 	display: flex;
-	align-items: baseline;
-	gap: 2px;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
 }
 
-.record-score {
-	font-size: var(--font-size-2xl);
-	font-weight: var(--font-weight-bold);
-	background: linear-gradient(135deg, #10b981, #059669);
-	-webkit-background-clip: text;
-	-webkit-text-fill-color: transparent;
-	background-clip: text;
-}
-
-.score-label {
-	font-size: var(--font-size-sm);
-	color: var(--text-secondary);
+.record-icon {
+	font-size: 18px;
+	color: $muted-color;
 }
 
 .record-info {
 	display: flex;
-	gap: var(--spacing-lg);
-	margin-bottom: var(--spacing-sm);
+	flex-direction: column;
+	gap: 4px;
 }
 
-.info-item {
+.record-title {
+	font-size: 14px;
+	font-weight: 600;
+	color: $title-color;
+}
+
+.record-meta {
+	font-size: 12px;
+	color: $muted-color;
+}
+
+.record-right {
 	display: flex;
 	align-items: center;
-	gap: var(--spacing-xs);
+	gap: 16px;
+	flex-shrink: 0;
 }
 
-.info-icon {
-	font-size: var(--font-size-sm);
-	opacity: 0.7;
-}
-
-.record-date,
-.record-duration {
-	font-size: var(--font-size-sm);
-	color: var(--text-secondary);
-}
-
-.record-tags {
+.record-score {
 	display: flex;
-	gap: var(--spacing-xs);
-	flex-wrap: wrap;
-	margin-bottom: var(--spacing-sm);
-}
-
-.record-tag {
-	padding: 4px 12px;
-	background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
-	color: var(--text-secondary);
-	border-radius: var(--radius-md);
-	font-size: var(--font-size-xs);
-	font-weight: var(--font-weight-medium);
-	border: 1px solid transparent;
-	transition: all var(--transition-fast);
-
-	&:hover {
-		background: linear-gradient(135deg, #dbeafe, #bfdbfe);
-		color: var(--primary-light);
-		border-color: rgba(59, 130, 246, 0.3);
-	}
-}
-
-.record-progress {
-	margin-top: var(--spacing-sm);
-}
-
-.progress-bar {
-	height: 4px;
-	background: var(--border-color);
-	border-radius: var(--radius-full);
-	overflow: hidden;
-}
-
-.progress-fill {
-	height: 100%;
-	background: linear-gradient(90deg, #10b981, #34d399);
-	border-radius: var(--radius-full);
-	transition: width 1s ease;
-	animation: progressGrow 1s ease;
-}
-
-@keyframes progressGrow {
-	from {
-		width: 0;
-	}
-}
-
-.start-section {
-	text-align: center;
-	margin-top: var(--spacing-2xl);
-	padding: var(--spacing-xl);
-	background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(6, 182, 212, 0.05));
-	border-radius: var(--radius-xl);
-	border: 1px dashed rgba(59, 130, 246, 0.3);
-	animation: fadeIn 0.6s ease;
-}
-
-.start-btn {
-	background: linear-gradient(135deg, var(--primary-light), #06b6d4);
-	color: #fff;
-	border: none;
-	padding: var(--spacing-md) var(--spacing-3xl);
-	border-radius: var(--radius-lg);
-	font-size: var(--font-size-lg);
-	font-weight: var(--font-weight-semibold);
-	cursor: pointer;
-	transition: all var(--transition-normal);
-	display: inline-flex;
+	flex-direction: column;
 	align-items: center;
-	gap: var(--spacing-sm);
-	box-shadow: 0 4px 20px rgba(59, 130, 246, 0.35);
-	position: relative;
-	overflow: hidden;
+	gap: 2px;
 
-	&:hover {
-		transform: translateY(-3px);
-		box-shadow: 0 8px 30px rgba(59, 130, 246, 0.45);
+	.score-number {
+		font-size: 18px;
+		font-weight: 700;
 
-		.btn-arrow {
-			transform: translateX(4px);
+		&.high {
+			color: $score-high;
+		}
+
+		&.medium {
+			color: $score-medium;
+		}
+
+		&.low {
+			color: $score-low;
 		}
 	}
 
-	&:active {
-		transform: translateY(-1px);
-	}
-
-	&::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: -100%;
-		width: 100%;
-		height: 100%;
-		background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-		transition: left 0.5s ease;
-	}
-
-	&:hover::before {
-		left: 100%;
+	.score-label {
+		font-size: 12px;
+		color: $muted-color;
 	}
 }
 
-.btn-icon-wrapper {
-	width: 32px;
-	height: 32px;
-	background: rgba(255, 255, 255, 0.2);
-	border-radius: 50%;
+.detail-btn {
+	height: 30px;
+	padding: 0 12px;
+	background: #fff;
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	font-size: 13px;
+	color: $subtitle-color;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-}
+	cursor: pointer;
+	transition: all 0.15s;
 
-.btn-icon {
-	font-size: 18px;
-	display: block;
-}
-
-.btn-text {
-	display: block;
-}
-
-.btn-arrow {
-	width: 20px;
-	height: 20px;
-	transition: transform var(--transition-fast);
-
-	svg {
-		width: 100%;
-		height: 100%;
+	&:hover {
+		border-color: $primary-blue;
+		color: $primary-blue;
 	}
 }
 
-.start-hint {
-	display: block;
-	margin-top: var(--spacing-md);
-	font-size: var(--font-size-sm);
-	color: var(--text-secondary);
-}
-
-// 响应式适配
+/* ── 响应式适配 ── */
 @media (max-width: 1024px) {
-	.mode-section {
-		grid-template-columns: repeat(2, 1fr);
-	}
-}
-
-@media (max-width: 768px) {
-	.interview-main {
-		padding: var(--spacing-lg) var(--spacing-md);
-	}
-
 	.mode-section {
 		grid-template-columns: 1fr;
 	}
 
-	.mode-card {
-		display: flex;
-		align-items: center;
-		text-align: left;
-		padding: var(--spacing-md);
-	}
-
-	.mode-icon-wrapper {
-		width: 56px;
-		height: 56px;
-		margin: 0 var(--spacing-md) 0 0;
-		flex-shrink: 0;
-	}
-
-	.mode-icon {
-		font-size: 28px;
-	}
-
-	.mode-content {
-		flex: 1;
-	}
-
-	.record-header {
+	.cta-banner {
 		flex-direction: column;
-		gap: var(--spacing-xs);
+		gap: 16px;
+		text-align: center;
+	}
+}
+
+@media (max-width: 768px) {
+	.search-box {
+		width: 200px;
 	}
 
-	.record-info {
-		flex-wrap: wrap;
-		gap: var(--spacing-sm);
+	.record-item {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 12px;
+	}
+
+	.record-right {
+		width: 100%;
+		justify-content: space-between;
 	}
 }
 </style>
