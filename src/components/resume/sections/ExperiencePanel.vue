@@ -52,14 +52,14 @@
 							placeholder="结束时间"
 						/>
 						<span v-else class="current-badge">至今</span>
-						<label class="current-toggle">
+						<!-- <label class="current-toggle">
 							<input
 								type="checkbox"
 								:checked="isCur(exp.date)"
 								@change="e => exp.date = build(getStart(exp.date), '', e.target.checked)"
 							/>
 							<span>至今</span>
-						</label>
+						</label> -->
 					</div>
 				</div>
 				<div class="form-group editor-group">

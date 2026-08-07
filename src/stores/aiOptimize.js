@@ -21,6 +21,7 @@ import {
 	fetchEditorFormat,
 } from '@/api/ai'
 import { parsedToEditorResume, editorResumeToAgentInput } from '@/utils/resume/agentAdapter'
+import { normalizeRichText } from '@/utils/resume/formatPreserve'
 
 export const OPTIMIZE_STEPS = [
 	{ key: 'init', label: '初始化', icon: '⚙' },
@@ -319,7 +320,7 @@ export const useAIOptimizeStore = defineStore('aiOptimize', () => {
 		const result = {}
 		for (const r of backendRewrites.rewrites) {
 			result[r.module] = {
-				optimized_html: r.rewritten ? `<p>${r.rewritten}</p>` : '',
+				optimized_html: r.rewritten ? normalizeRichText(r.rewritten) : '',
 				change_summary: r.change_summary ? [r.change_summary] : [],
 				keywords_added: r.keywords_added || [],
 				original: r.original || '',

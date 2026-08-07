@@ -39,8 +39,7 @@
 					<text class="major">{{ userMajor }}</text>
 				</view>
 			</view>
-			<text class="settings-icon" v-if="isLogin" @click.stop="handleSettingsClick">⚙</text>
-			<text class="login-hint" v-else>登录</text>
+			<text class="login-hint" v-if="!isLogin">登录</text>
 		</view>
 
 		<!-- 登录/注册弹窗 -->
@@ -144,35 +143,6 @@ const navigate = (pageId) => {
 	} else {
 		setTimeout(doNav, 50)
 	}
-}
-
-// 点击设置图标
-const handleSettingsClick = async (e) => {
-	if (e) e.stopPropagation()
-	if (!isLogin.value) return
-
-	uni.showActionSheet({
-		itemList: ['退出登录'],
-		success: (res) => {
-			if (res.tapIndex === 0) {
-				uni.showModal({
-					title: '提示',
-					content: '确定要退出登录吗？',
-					confirmText: '确定',
-					cancelText: '取消',
-					success: async (modalRes) => {
-						if (modalRes.confirm) {
-							await userStore.logout()
-							uni.showToast({ title: '已退出登录', icon: 'success' })
-							setTimeout(() => {
-								window.location.href = '/#/pages/Home/Home'
-							}, 500)
-						}
-					}
-				})
-			}
-		}
-	})
 }
 
 // 点击用户区域
@@ -392,19 +362,6 @@ $sidebar-width: 240px;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-}
-
-.settings-icon {
-	font-size: 18px;
-	opacity: 0.7;
-	cursor: pointer;
-	flex-shrink: 0;
-	transition: opacity 0.2s;
-	padding: 4px;
-
-	&:hover {
-		opacity: 1;
-	}
 }
 
 .login-hint {

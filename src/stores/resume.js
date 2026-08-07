@@ -71,6 +71,7 @@ export const useResumeStore = defineStore('resume', () => {
 	const listLoading = ref(false)
 	const saving = ref(false)
 	const syncError = ref('')
+	const hasUnsavedChanges = ref(false)
 
 	// ════════════════════════════════════════════════════════════════
 	// 2. 派生
@@ -488,9 +489,11 @@ export const useResumeStore = defineStore('resume', () => {
 			const local = resumes[resumeId]
 			const resume = fromApiResponse(res.data, local || {})
 			if (!resume) return { success: false, message: '数据解析失败' }
+			suppressDirtyUntil = Date.now() + 300
 			_upsertResume(local ? mergeResumeWithDraft(local, resume) : resume)
 			activeResumeId.value = resumeId
 			_performSave()
+			hasUnsavedChanges.value = false
 			return { success: true }
 		} catch (e) {
 			console.error('loadResumeFromServer:', e)
@@ -783,8 +786,10 @@ export const useResumeStore = defineStore('resume', () => {
 	let apiSaveRetryCount = 0
 	let apiSaveFailureCooldownUntil = 0
 	let apiSaveSuccessPauseUntil = 0
+	let savePromise = null
 	let lastSavedPayloadHash = null
 	let lastSavedAt = 0
+	let suppressDirtyUntil = 0
 	const API_SAVE_MAX_RETRIES = 1
 	const API_SAVE_COOLDOWN_MS = 30000
 	const API_SAVE_MIN_INTERVAL_MS = 5000
@@ -801,57 +806,69 @@ export const useResumeStore = defineStore('resume', () => {
 
 	async function _saveActiveToServer(useSafePayload = false) {
 		const r = activeResume.value
-		if (!r?.id || !_hasToken() || apiSaveInFlight) return
+		if (!r?.id || !_hasToken()) {
+			return { success: false, message: '未登录或简历不存在', skipped: true }
+		}
+
+		// 已有保存请求在途：直接等待同一个请求，避免并发导致“假失败”
+		if (apiSaveInFlight && savePromise) {
+			return savePromise
+		}
 
 		// 失败冷却期：服务端异常时暂停自动保存，避免无限重试
-		if (Date.now() < apiSaveFailureCooldownUntil) return
+		if (Date.now() < apiSaveFailureCooldownUntil) {
+			return { success: false, message: '保存过于频繁，请稍后重试', skipped: true }
+		}
 
 		apiSaveInFlight = true
 		saving.value = true
-		let payload = null
-		try {
-			payload = useSafePayload ? toSafeApiPayload(r) : toApiPayload(r)
-			const payloadJson = JSON.stringify(payload)
-			const payloadHash = _hashString(payloadJson)
-			const payloadSizeKb = Math.round(payloadJson.length / 1024)
+		savePromise = (async () => {
+			let payload = null
+			try {
+				payload = useSafePayload ? toSafeApiPayload(r) : toApiPayload(r)
+				const payloadJson = JSON.stringify(payload)
+				const payloadHash = _hashString(payloadJson)
+				const payloadSizeKb = Math.round(payloadJson.length / 1024)
 
-			// 内容未变化，跳过
-			if (payloadHash === lastSavedPayloadHash && Date.now() - lastSavedAt < API_SAVE_MIN_INTERVAL_MS) {
-				return
-			}
+				// 内容未变化，跳过
+				if (payloadHash === lastSavedPayloadHash && Date.now() - lastSavedAt < API_SAVE_MIN_INTERVAL_MS) {
+					return { success: true, skipped: true }
+				}
 
-			console.log(`[save] resumeId=${r.id} mode=${useSafePayload ? 'safe' : 'full'} size=${payloadSizeKb}KB`)
+				console.log(`[save] resumeId=${r.id} mode=${useSafePayload ? 'safe' : 'full'} size=${payloadSizeKb}KB`)
 
-			const res = await updateResumeApi(r.id, payload)
-			if (!res.ok) {
-				const status = res.code ?? res.statusCode ?? res.raw?.code
-				const message = res.message || '保存失败'
-				const isServerError = status === 500 || message.includes('500')
-				const isGatewayError = status === 502 || status === 503 || message.includes('502') || message.includes('Bad Gateway')
-				syncError.value = message
+				const res = await updateResumeApi(r.id, payload)
+				if (!res.ok) {
+					const status = res.code ?? res.statusCode ?? res.raw?.code
+					const message = res.message || '保存失败'
+					const isServerError = status === 500 || message.includes('500')
+					const isGatewayError = status === 502 || status === 503 || message.includes('502') || message.includes('Bad Gateway')
+					syncError.value = message
 
-				// 服务端异常：立即进入较长冷却期，避免连续重试压垮后端
-				if (isServerError || isGatewayError) {
-					apiSaveFailureCooldownUntil = Date.now() + API_SAVE_COOLDOWN_MS
-					apiSaveRetryCount = 0
-					if (isGatewayError) {
-						uni.showToast?.({ title: '无法连接到后端服务，已暂停自动保存', icon: 'none', duration: 3000 })
+					// 服务端异常：立即进入较长冷却期，避免连续重试压垮后端
+					if (isServerError || isGatewayError) {
+						apiSaveFailureCooldownUntil = Date.now() + API_SAVE_COOLDOWN_MS
+						apiSaveRetryCount = 0
+						if (isGatewayError) {
+							uni.showToast?.({ title: '无法连接到后端服务，已暂停自动保存', icon: 'none', duration: 3000 })
+						}
+						console.warn(`[save] 服务端异常 ${status || 500}，暂停 ${API_SAVE_COOLDOWN_MS / 1000}s`, { message, size: payloadJson.length })
+						return { success: false, message, code: status }
 					}
-					console.warn(`[save] 服务端异常 ${status || 500}，暂停 ${API_SAVE_COOLDOWN_MS / 1000}s`, { message, size: payloadJson.length })
-					return
+
+					// 业务错误（如 401/400）少量重试
+					if (apiSaveRetryCount < API_SAVE_MAX_RETRIES) {
+						apiSaveRetryCount += 1
+						const backoffMs = 5000 * apiSaveRetryCount
+						setTimeout(() => scheduleApiSave(), backoffMs)
+					} else {
+						apiSaveRetryCount = 0
+						apiSaveFailureCooldownUntil = Date.now() + API_SAVE_COOLDOWN_MS
+						uni.showToast?.({ title: '简历同步失败，请检查网络或稍后重试', icon: 'none', duration: 3000 })
+					}
+					return { success: false, message, code: status }
 				}
 
-				// 业务错误（如 401/400）少量重试
-				if (apiSaveRetryCount < API_SAVE_MAX_RETRIES) {
-					apiSaveRetryCount += 1
-					const backoffMs = 5000 * apiSaveRetryCount
-					setTimeout(() => scheduleApiSave(), backoffMs)
-				} else {
-					apiSaveRetryCount = 0
-					apiSaveFailureCooldownUntil = Date.now() + API_SAVE_COOLDOWN_MS
-					uni.showToast?.({ title: '简历同步失败，请检查网络或稍后重试', icon: 'none', duration: 3000 })
-				}
-			} else {
 				apiSaveRetryCount = 0
 				apiSaveFailureCooldownUntil = 0
 				syncError.value = ''
@@ -863,17 +880,24 @@ export const useResumeStore = defineStore('resume', () => {
 				// 用服务端返回数据合并，但尽量不改变引用对象上的字段命名，减少 watch 触发
 				const updated = fromApiResponse(res.data)
 				if (updated) {
+					suppressDirtyUntil = Date.now() + 300
 					resumes[r.id] = mergeResumeWithDraft(r, { ...updated, id: r.id })
 				}
+				hasUnsavedChanges.value = false
 				console.log('[save] ok')
+				return { success: true }
+			} catch (e) {
+				console.error('[save] 异常:', e?.message || e)
+				apiSaveFailureCooldownUntil = Date.now() + API_SAVE_COOLDOWN_MS
+				return { success: false, message: '保存失败，请检查网络后重试' }
+			} finally {
+				apiSaveInFlight = false
+				saving.value = false
+				savePromise = null
 			}
-		} catch (e) {
-			console.error('[save] 异常:', e?.message || e)
-			apiSaveFailureCooldownUntil = Date.now() + API_SAVE_COOLDOWN_MS
-		} finally {
-			apiSaveInFlight = false
-			saving.value = false
-		}
+		})()
+
+		return savePromise
 	}
 
 	function scheduleApiSave() {
@@ -910,7 +934,12 @@ export const useResumeStore = defineStore('resume', () => {
 	}
 
 	// 任何字段变化都触发 debounced 本地 + 远端保存
-	watch([resumes, activeResumeId], scheduleSave, { deep: true })
+	watch([resumes, activeResumeId], () => {
+		// 加载简历 / 服务端回写造成的 watch 不标记为“未保存”
+		if (Date.now() < suppressDirtyUntil) return
+		hasUnsavedChanges.value = true
+		scheduleSave()
+	}, { deep: true })
 
 	// 切换简历时重置保存状态，避免上一份简历的暂停/哈希影响新简历
 	watch(activeResumeId, (newId, oldId) => {
@@ -946,6 +975,8 @@ export const useResumeStore = defineStore('resume', () => {
 	}
 
 	function loadFromLocal() {
+		suppressDirtyUntil = Date.now() + 300
+		hasUnsavedChanges.value = false
 		try {
 			const raw = uni.getStorageSync(STORAGE_KEY)
 			if (!raw) { hydrated = true; return false }
@@ -973,6 +1004,7 @@ export const useResumeStore = defineStore('resume', () => {
 		listLoading,
 		saving,
 		syncError,
+		hasUnsavedChanges,
 		// computed
 		activeResume,
 		allResumes,

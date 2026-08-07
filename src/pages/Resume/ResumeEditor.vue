@@ -12,10 +12,10 @@
 				>
 					<svg viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
 				</button>
-				<button class="back-btn" @click="goBack" title="返回">
+				<!-- <button class="back-btn" @click="goBack" title="返回">
 					<svg viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-				</button>
-				<span class="logo-text" @click="goBack">魔方简历</span>
+				</button> -->
+				<span class="logo-text" @click="goBack">智简优面</span>
 				<div class="divider-v" />
 				<div class="backup-badge">
 					<svg viewBox="0 0 14 14" fill="none" style="width:11px;height:11px"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M7 4v3l2 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -146,11 +146,21 @@
 
 		<AIOptimizeAnalysisPanel
 			:visible="showAnalysisPanel"
+			:apply-module="applyModuleWithPreview"
+			:apply-modules="applyModulesWithPreview"
 			@close="showAnalysisPanel = false"
 			@regenerate="openAIPanel"
 			@apply-all="handleApplyAllOptimizations"
-			@apply-module="handleApplyModuleOptimization"
+			@apply-module="applyModuleWithPreview"
 			@option-action="handleAIOptionAction"
+		/>
+
+		<FormatPreviewDialog
+			v-if="previewState"
+			:visible="true"
+			:sections="previewState.sections"
+			@close="closePreview"
+			@apply="confirmPreviewApply"
 		/>
 
 		<SaveAsTemplateDialog
@@ -183,6 +193,7 @@ import ClassicTemplate from '@/components/resume/ClassicTemplate.vue'
 import AIOptimizeDialog from '@/components/AIOptimize/AIOptimizeDialog.vue'
 import ChatDialog from '@/components/AIOptimize/ChatDialog.vue'
 import AIOptimizeAnalysisPanel from '@/components/AIOptimize/AIOptimizeAnalysisPanel.vue'
+import FormatPreviewDialog from '@/components/AIOptimize/optimization/FormatPreviewDialog.vue'
 import SaveAsTemplateDialog from '@/components/TemplateGallery/SaveAsTemplateDialog.vue'
 
 const A4_WIDTH_PX = 794   // 210mm at 96dpi
@@ -207,6 +218,7 @@ const showAIDialog = ref(false)
 const showChatDialog = ref(false)
 const showAnalysisPanel = ref(false)
 let pendingModuleIds = []
+let aiPanelTask = null
 
 const resumeTitle = computed(() => activeResume.value?.title || '未命名简历')
 const activeSection = computed(() => activeResume.value?.activeSection || 'basic')
@@ -288,6 +300,7 @@ onMounted(() => {
 	// Collapse side panel on narrow screens
 	if (window.innerWidth < 1200) sidePanelCollapsed.value = true
 	if (window.innerWidth < 900) editPanelCollapsed.value = true
+	window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
 // ── onLoad ────────────────────────────────────────────────────────
@@ -352,13 +365,34 @@ onMounted(() => {
 
 onUnmounted(() => {
 	resizeObs?.disconnect()
+	window.removeEventListener('beforeunload', handleBeforeUnload)
 	store.flushSave()
 })
+
+function handleBeforeUnload(e) {
+	if (!store.hasUnsavedChanges) return
+	e.preventDefault()
+	e.returnValue = ''
+}
 
 // ── Navigation ───────────────────────────────────────────────────
 function goBack() {
 	const doNav = () =>
 		uni.navigateBack({ delta: 1, fail: () => uni.reLaunch({ url: '/pages/Resume/Resume' }) })
+
+	if (store.hasUnsavedChanges) {
+		uni.showModal({
+			title: '未保存的更改',
+			content: '简历有尚未保存的修改，确定要退出吗？',
+			confirmText: '退出',
+			cancelText: '继续编辑',
+			success: (res) => {
+				if (res.confirm) doNav()
+			},
+		})
+		return
+	}
+
 	// View Transition API：浏览器支持时走过渡，避免页面切换白屏闪烁
 	if (typeof document !== 'undefined' && document.startViewTransition) {
 		document.startViewTransition(doNav)
@@ -426,7 +460,7 @@ async function handleSave() {
 	try {
 		const result = await store.saveActiveToServer()
 		if (result?.success) {
-			uni.showToast({ title: '保存成功', icon: 'success' })
+			uni.showToast({ title: result.skipped ? '内容未变化' : '保存成功', icon: result.skipped ? 'none' : 'success' })
 			saveFlash.value = true
 			setTimeout(() => { saveFlash.value = false }, 400)
 			// 保存后同步更新求职画像到 AI 会话
@@ -442,56 +476,63 @@ async function handleSave() {
 	}
 }
 
-async function openAIPanel() {
+function openAIPanel() {
 	const resume = activeResume.value
-	if (!resume) return
+	if (!resume || aiPanelTask) return
 
-	// 先调用 career_profiler 建立求职画像
-	await runCareerProfiler()
-
-	const agentInput = editorResumeToAgentInput(resume)
-	const textParts = []
-	if (agentInput.name) textParts.push(`姓名：${agentInput.name}`)
-	if (agentInput.title) textParts.push(`求职意向：${agentInput.title}`)
-	if (agentInput.education?.length) {
-		textParts.push('\n【教育背景】')
-		agentInput.education.forEach(e => textParts.push(`${e.school} ${e.major} ${e.degree}`))
-	}
-	if (agentInput.experience?.length) {
-		textParts.push('\n【工作经历】')
-		agentInput.experience.forEach(e => textParts.push(`${e.company} ${e.position} ${e.date}\n${e.details}`))
-	}
-	if (agentInput.projects?.length) {
-		textParts.push('\n【项目经历】')
-		agentInput.projects.forEach(p => textParts.push(`${p.name}\n${p.description}`))
-	}
-	if (agentInput.skills) textParts.push(`\n【技能】\n${agentInput.skills}`)
-	if (agentInput.selfEvaluation) textParts.push(`\n【自我评价】\n${agentInput.selfEvaluation}`)
-	const resumeText = textParts.join('\n')
-
-	const sections = resume?.menuSections || []
-	pendingModuleIds = sections.filter(s => s.enabled && s.id !== 'basic').map(s => s.id)
-
+	// 立即打开右侧面板，避免用户多次点击才出现
 	showAnalysisPanel.value = true
 
-	// 1. 解析简历（上传 + 简历解析 agent）
-	const parseRes = await aiStore.parseExistingResume(resumeText)
-	if (!parseRes.success) {
-		uni.showToast({ title: parseRes.message || '简历解析失败', icon: 'none' })
-		return
-	}
+	aiPanelTask = (async () => {
+		try {
+			// 先调用 career_profiler 建立求职画像
+			await runCareerProfiler()
 
-	// 2. 运行 agent 链：诊断 + 策略 + 模块优化（agent5）
-	// 把弹窗中已粘贴的目标岗位 JD 传给后端，避免用户重复输入
-	const optRes = await aiStore.runFullOptimization({
-		prompt: '',
-		jdText: careerIntentStore.jdText || '',
-		moduleIds: pendingModuleIds,
-		skipParse: true,
-	})
-	if (!optRes.success) {
-		uni.showToast({ title: optRes.message || '匹配分析失败', icon: 'none' })
-	}
+			const agentInput = editorResumeToAgentInput(resume)
+			const textParts = []
+			if (agentInput.name) textParts.push(`姓名：${agentInput.name}`)
+			if (agentInput.title) textParts.push(`求职意向：${agentInput.title}`)
+			if (agentInput.education?.length) {
+				textParts.push('\n【教育背景】')
+				agentInput.education.forEach(e => textParts.push(`${e.school} ${e.major} ${e.degree}`))
+			}
+			if (agentInput.experience?.length) {
+				textParts.push('\n【工作经历】')
+				agentInput.experience.forEach(e => textParts.push(`${e.company} ${e.position} ${e.date}\n${e.details}`))
+			}
+			if (agentInput.projects?.length) {
+				textParts.push('\n【项目经历】')
+				agentInput.projects.forEach(p => textParts.push(`${p.name}\n${p.description}`))
+			}
+			if (agentInput.skills) textParts.push(`\n【技能】\n${agentInput.skills}`)
+			if (agentInput.selfEvaluation) textParts.push(`\n【自我评价】\n${agentInput.selfEvaluation}`)
+			const resumeText = textParts.join('\n')
+
+			const sections = resume?.menuSections || []
+			pendingModuleIds = sections.filter(s => s.enabled && s.id !== 'basic').map(s => s.id)
+
+			// 1. 解析简历（上传 + 简历解析 agent）
+			const parseRes = await aiStore.parseExistingResume(resumeText)
+			if (!parseRes.success) {
+				uni.showToast({ title: parseRes.message || '简历解析失败', icon: 'none' })
+				return
+			}
+
+			// 2. 运行 agent 链：诊断 + 策略 + 模块优化（agent5）
+			// 把弹窗中已粘贴的目标岗位 JD 传给后端，避免用户重复输入
+			const optRes = await aiStore.runFullOptimization({
+				prompt: '',
+				jdText: careerIntentStore.jdText || '',
+				moduleIds: pendingModuleIds,
+				skipParse: true,
+			})
+			if (!optRes.success) {
+				uni.showToast({ title: optRes.message || '匹配分析失败', icon: 'none' })
+			}
+		} finally {
+			aiPanelTask = null
+		}
+	})()
 }
 
 async function handleChatSubmit(profileData) {
@@ -525,62 +566,101 @@ function handleTemplateSaved() {
 	uni.showToast({ title: '模板已保存', icon: 'success' })
 }
 
-function applyModuleContent(module, item) {
-	const html = item?.optimized_html || ''
-	if (!html) return false
+async function persistAfterApply() {
+	store.saveToLocal()
+	await store.saveActiveToServer()
+}
 
+const previewState = ref(null)
+let previewResolver = null
+
+const moduleLabelMap = {
+	basic: '基本信息',
+	education: '教育背景',
+	experience: '工作经历',
+	projects: '项目经历',
+	skills: '专业技能',
+	summary: '自我评价',
+	certifications: '证书资质',
+}
+
+function moduleLabel(key) {
+	return moduleLabelMap[key] || key
+}
+
+function getModuleOriginalHtml(module) {
+	const r = activeResume.value
+	if (!r) return ''
 	switch (module) {
-		case 'summary':
-			store.updateSelfEvaluation(html)
-			return true
-		case 'skills':
-			store.updateSkillContent(html)
-			return true
-		case 'experience':
-		case 'projects':
-		case 'education':
-			// 结构化模块暂不自动覆盖，避免丢失多条目细节
-			return false
-		default:
-			return false
+		case 'summary': return r.selfEvaluationContent || ''
+		case 'skills': return r.skillContent || ''
+		case 'experience': return r.experience?.[0]?.details || ''
+		case 'projects': return r.projects?.[0]?.description || ''
+		case 'education': return r.education?.[0]?.description || ''
+		case 'certifications': return r.customData?.certifications?.[0]?.description || ''
+		default: return r.customData?.[module]?.[0]?.description || ''
 	}
 }
 
-function handleApplyModuleOptimization(module) {
-	const item = aiStore.moduleResults?.[module]
-	if (!item) return
+function openFormatPreview(sections) {
+	return new Promise((resolve) => {
+		previewResolver = resolve
+		previewState.value = { sections }
+	})
+}
 
-	const applied = applyModuleContent(module, item)
-	if (applied) {
-		uni.showToast({ title: '已应用该模块优化', icon: 'success' })
-	} else {
-		uni.showToast({ title: '结构化模块请手动参考建议修改', icon: 'none' })
+function closePreview() {
+	if (previewResolver) previewResolver(false)
+	previewResolver = null
+	previewState.value = null
+}
+
+async function confirmPreviewApply(strategy, merged) {
+	let count = 0
+	for (const item of merged) {
+		if (!item?.html) continue
+		store.applyOptimizedModule(item.module, item.html)
+		count++
 	}
+	if (count > 0) {
+		await persistAfterApply()
+		uni.showToast({ title: `成功应用 ${count} 条格式化的优化建议`, icon: 'success' })
+	}
+	if (previewResolver) previewResolver(true)
+	previewResolver = null
+	previewState.value = null
+}
+
+async function applyModuleWithPreview(module) {
+	const item = aiStore.moduleResults?.[module]
+	if (!item?.optimized_html) return false
+	return openFormatPreview([{
+		module,
+		label: moduleLabel(module),
+		originalHtml: getModuleOriginalHtml(module),
+		aiHtml: item.optimized_html,
+	}])
+}
+
+async function applyModulesWithPreview(modules) {
+	const sections = (modules || [])
+		.map((m) => {
+			const item = aiStore.moduleResults?.[m]
+			return {
+				module: m,
+				label: moduleLabel(m),
+				originalHtml: getModuleOriginalHtml(m),
+				aiHtml: item?.optimized_html || '',
+			}
+		})
+		.filter((s) => s.aiHtml)
+	if (!sections.length) return false
+	return openFormatPreview(sections)
 }
 
 function handleApplyAllOptimizations() {
-	const results = aiStore.moduleResults || {}
-	let appliedCount = 0
-	let skippedCount = 0
-
-	for (const [module, item] of Object.entries(results)) {
-		const applied = applyModuleContent(module, item)
-		if (applied) {
-			appliedCount++
-		} else if (item?.optimized_html) {
-			skippedCount++
-		}
-	}
-
-	if (appliedCount > 0) {
-		uni.showToast({
-			title: `已应用 ${appliedCount} 个模块，${skippedCount > 0 ? skippedCount + ' 个需手动确认' : ''}`,
-			icon: 'success',
-			duration: 2000,
-		})
-	} else {
-		uni.showToast({ title: '暂无可自动应用的文本模块', icon: 'none' })
-	}
+	const modules = Object.keys(aiStore.moduleResults || {}).filter((m) => aiStore.moduleResults?.[m]?.optimized_html)
+	applyModulesWithPreview(modules)
 }
 
 function handleAIOptionAction(option) {
@@ -1014,7 +1094,7 @@ ${el.innerHTML}
 }
 
 .editor-body.analysis-open {
-	padding-right: 336px;
+	padding-right: 360px;
 }
 
 /* ── H5 输入框 pointer-events 修复（仅作用于简历编辑器内部，避免影响全局页面） ── */

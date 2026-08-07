@@ -70,7 +70,7 @@ function addItem() {
 	&.open { transform: rotate(270deg); }
 }
 .icon-act-btn {
-	width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+	width: 22px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
 	border: none; background: none; border-radius: 4px; cursor: pointer;
 	font-size: 12px; color: #6b7280;
 	&:hover { background: #f3f4f6; color: #111827; }
