@@ -7,14 +7,24 @@ export default defineConfig({
   ],
   // 开发服务器代理配置，解决 CORS 跨域问题
   server: {
+    // 增强 HMR 稳定性，减少 ECONNRESET 刷屏
+    hmr: {
+      timeout: 60000,
+      overlay: false,
+    },
     proxy: {
       '/api': {
         target: 'http://81.71.75.85:6008',
         changeOrigin: true,
+        ws: false,
       },
       '/ai-api': {
-        target: 'http://localhost:8000',
+        target: 'http://118.126.102.143:8000',
+        // target: 'http://localhost:8000',
         changeOrigin: true,
+        ws: false,
+        timeout: 600000,
+        proxyTimeout: 600000,
         rewrite: (path) => path.replace(/^\/ai-api/, '/api'),
       },
     },

@@ -1,6 +1,6 @@
 /**
  * 用户求职意向 API — 对接 ResumeAgent FastAPI 服务
- * 基础地址: /ai-api (开发代理到 http://localhost:8000/api)
+ * 基础地址: /ai-api (开发代理到 http://118.126.102.143:8000/api)
  */
 import { aiRequest } from '@/api/ai'
 

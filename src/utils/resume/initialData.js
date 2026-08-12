@@ -146,6 +146,86 @@ export function createNewResume(overrides = {}) {
 	}
 }
 
+/**
+ * 示例简历：用户新建简历时预填示例内容，可直接在此基础上修改。
+ * 内容按「鱼皮简历指南」要点编写：项目经历用万能公式、技能补充细节与实践。
+ */
+export function createSampleResume(overrides = {}) {
+	const now = new Date().toISOString()
+	const base = JSON.parse(JSON.stringify(initialResumeState))
+	return {
+		...base,
+		id: generateId(),
+		createdAt: now,
+		updatedAt: now,
+		title: '示例简历（可直接修改）',
+		basic: {
+			...base.basic,
+			name: '张三',
+			title: '前端开发工程师',
+			employementStatus: '应届生',
+			email: 'zhangsan@example.com',
+			phone: '138-0000-0000',
+			location: '上海市',
+			birthDate: '',
+			photo: '',
+			customFields: [
+				{ id: 'cf1', label: '个人网站', value: 'https://zhangsan.dev', icon: '🌐', visible: true },
+				{ id: 'cf2', label: 'GitHub', value: 'https://github.com/zhangsan', icon: '🐙', visible: true },
+			],
+		},
+		education: [
+			{
+				id: generateId(),
+				school: '示例大学',
+				major: '计算机科学与技术',
+				degree: '本科',
+				startDate: '2020-09',
+				endDate: '2024-06',
+				gpa: '3.6/4.0',
+				description: '主修课程：数据结构、算法设计、操作系统、计算机网络、Web 开发技术',
+				visible: true,
+			},
+		],
+		experience: [
+			{
+				id: generateId(),
+				company: '示例科技有限公司',
+				position: '前端开发工程师',
+				date: '2024-07 - 至今',
+				details: '<ul><li>负责核心业务系统前端开发，参与需求评审与技术方案设计</li><li>使用 Vue3 + TypeScript 重构订单管理模块，首屏加载时间从 3s 优化到 1.2s</li><li>搭建团队组件库与构建规范，研发效率提升约 30%</li></ul>',
+				visible: true,
+			},
+		],
+		projects: [
+			{
+				id: generateId(),
+				name: '企业级数据可视化平台',
+				role: '核心开发',
+				date: '2025-01 - 2025-06',
+				description: '<ul><li>在日均百万级数据量的业务背景下，基于 WebGL 自研图表渲染引擎，实现 10 万点图表 60fps 流畅渲染</li><li>利用 Canvas 分层绘制与虚拟滚动技术，解决大数据量下页面卡顿问题</li><li>封装可复用的图表组件库，支撑 5 条业务线快速接入</li></ul>',
+				visible: true,
+				link: 'https://example.com',
+			},
+		],
+		certificates: [],
+		customData: {},
+		skillContent: '<ul><li>前端框架：熟悉 Vue3 + TypeScript，掌握组合式 API 与响应式原理，曾用于企业后台系统开发</li><li>开发语言：JavaScript(ES6+)、HTML5、CSS3，了解 Node.js 服务端开发</li><li>工程化工具：Webpack、Vite、ESLint，掌握构建优化与代码规范落地</li><li>数据可视化：ECharts、Canvas/WebGL，曾用于可视化大屏项目</li></ul>',
+		selfEvaluationContent: '<p>2 年前端开发经验，熟悉主流技术栈与工程化实践，具备大型业务系统开发经验；学习能力强，擅长把业务需求落地为高质量产品。</p>',
+		activeSection: 'basic',
+		menuSections: [
+			{ id: 'basic', title: '基本信息', icon: '👤', enabled: true, order: 0 },
+			{ id: 'experience', title: '工作经历', icon: '💼', enabled: true, order: 1 },
+			{ id: 'projects', title: '项目经历', icon: '🚀', enabled: true, order: 2 },
+			{ id: 'education', title: '教育背景', icon: '🎓', enabled: true, order: 3 },
+			{ id: 'skills', title: '专业技能', icon: '⚡', enabled: true, order: 4 },
+			{ id: 'selfEvaluation', title: '自我评价', icon: '💬', enabled: true, order: 5 },
+		],
+		globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+		...overrides,
+	}
+}
+
 /** 空白简历：仅含基本信息模块，其余模块由用户按需添加 */
 export function createBlankResume(overrides = {}) {
 	const now = new Date().toISOString()

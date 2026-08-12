@@ -39,13 +39,19 @@
 					<text class="major">{{ userMajor }}</text>
 				</view>
 			</view>
-			<text class="login-hint" v-if="!isLogin">登录</text>
+			<button v-if="isLogin" class="logout-btn" @click.stop="handleLogout" title="退出登录">
+				<svg viewBox="0 0 16 16" fill="none"><path d="M10.5 4.5L14 8l-3.5 3.5M14 8H6M6 2.5H3a1 1 0 00-1 1v9a1 1 0 001 1h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				<text>退出</text>
+			</button>
+			<text v-else class="login-hint" @click.stop="handleUserClick">登录</text>
 		</view>
 
 		<!-- 登录/注册弹窗 -->
 		<LoginPopup
-			v-model:visible="showLoginPopup"
-			@success="handleLoginSuccess"
+			:visible="userStore.loginPopupVisible"
+			:tip="expiredTip"
+			@update:visible="userStore.closeLoginPopup()"
+			@success="userStore.closeLoginPopup()"
 		/>
 	</view>
 </template>
@@ -61,8 +67,10 @@ import { DEFAULT_AVATAR, resolveAvatar } from '@/utils/avatar'
 const userStore = useUserStore()
 const { isLogin, userInfo } = storeToRefs(userStore)
 
-// 登录弹窗状态
-const showLoginPopup = ref(false)
+// 登录过期提示（复用 LoginPopup 弹窗）
+const expiredTip = computed(() =>
+	userStore.tokenExpired ? '登录已过期，请重新登录' : ''
+)
 
 // 导航菜单配置
 const menuItems = ref([
@@ -150,13 +158,23 @@ const handleUserClick = () => {
 	if (isLogin.value) {
 		navigate('my')
 	} else {
-		showLoginPopup.value = true
+		userStore.openLoginPopup()
 	}
 }
 
-// 登录成功回调（LoginPopup 内部已通过 userStore 更新全局状态，这里只需关闭弹窗）
-const handleLoginSuccess = () => {
-	showLoginPopup.value = false
+// 退出登录
+const handleLogout = () => {
+	uni.showModal({
+		title: '退出登录',
+		content: '确定要退出当前账号吗？',
+		confirmText: '退出',
+		cancelText: '取消',
+		success: async (res) => {
+			if (!res.confirm) return
+			await userStore.logout()
+			uni.showToast({ title: '已退出登录', icon: 'none' })
+		}
+	})
 }
 
 // 组件挂载时同步 store 与 storage
@@ -377,6 +395,32 @@ $sidebar-width: 240px;
 
 	&:hover {
 		background: rgba(255, 255, 255, 0.2);
+	}
+}
+
+.logout-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex-shrink: 0;
+	padding: 5px 9px;
+	border: none;
+	border-radius: 6px;
+	background: rgba(239, 68, 68, 0.16);
+	color: #fca5a5;
+	font-size: 12px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background 0.2s, color 0.2s;
+
+	svg {
+		width: 12px;
+		height: 12px;
+	}
+
+	&:hover {
+		background: rgba(239, 68, 68, 0.3);
+		color: #ffffff;
 	}
 }
 </style>

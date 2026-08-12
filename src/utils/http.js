@@ -3,6 +3,8 @@
  * 与登录等模块共用同一后端：http://81.71.75.85:6008/api
  */
 
+import { useUserStore } from '@/stores/user'
+
 // 开发环境使用代理，生产环境使用完整 URL
 export const API_BASE_URL = import.meta.env.DEV ? '/api' : 'http://81.71.75.85:6008/api'
 
@@ -13,15 +15,13 @@ function getToken() {
 }
 
 function handleTokenExpired() {
-	uni.removeStorageSync('token')
-	uni.removeStorageSync('userInfo')
-
 	if (_tokenExpiredTimer) return
 	_tokenExpiredTimer = setTimeout(() => {
 		_tokenExpiredTimer = null
 	}, 2000)
 
-	uni.$emit('token-expired')
+	// 统一走 Pinia：清空登录态并弹出登录弹窗
+	useUserStore().markTokenExpired()
 }
 
 /**

@@ -14,6 +14,7 @@
 				</view>
 				<text class="popup-title">{{ isLoginMode ? '登录' : '注册' }} AI 求职助手</text>
 				<text class="popup-subtitle">{{ isLoginMode ? '解锁更多智能求职功能' : '开启智能求职之旅' }}</text>
+				<text class="popup-tip" v-if="tip">{{ tip }}</text>
 			</view>
 
 			<!-- 切换标签 -->
@@ -103,6 +104,9 @@
 					<text class="forgot" @click="handleForgot">忘记密码？</text>
 				</view>
 
+				<!-- 内联错误提示 -->
+				<view class="popup-error" v-if="errorMsg">{{ errorMsg }}</view>
+
 				<!-- 提交按钮 -->
 				<view class="submit-btn" :class="{ loading: isLoading }" @click="handleSubmit">
 					<template v-if="isLoading">
@@ -154,6 +158,10 @@ const props = defineProps({
 	visible: {
 		type: Boolean,
 		default: false
+	},
+	tip: {
+		type: String,
+		default: ''
 	}
 })
 
@@ -184,12 +192,14 @@ const errors = ref({
 const showPassword = ref(false)
 const rememberMe = ref(false)
 const isLoading = ref(false)
+const errorMsg = ref('')
 
 // 切换模式
 const switchMode = (mode) => {
 	isLoginMode.value = mode === 'login'
 	// 清空错误
 	errors.value = { username: '', email: '', nickname: '', password: '', confirmPassword: '' }
+	errorMsg.value = ''
 }
 
 // 验证字段
@@ -320,16 +330,18 @@ const handleSubmit = async () => {
 				}, 1000)
 			}
 		} else {
+			errorMsg.value = result.message || (isLoginMode.value ? '登录失败' : '注册失败')
 			uni.showToast({
-				title: result.message || (isLoginMode.value ? '登录失败' : '注册失败'),
+				title: errorMsg.value,
 				icon: 'none',
 				duration: 2000
 			})
 		}
 	} catch (error) {
 		console.error('提交异常:', error)
+		errorMsg.value = '操作失败，请稍后重试'
 		uni.showToast({
-			title: '操作失败，请稍后重试',
+			title: errorMsg.value,
 			icon: 'none'
 		})
 	} finally {
@@ -366,6 +378,7 @@ watch(() => props.visible, (val) => {
 			form.value.username = rememberedUsername
 			rememberMe.value = true
 		}
+		errorMsg.value = ''
 	}
 })
 </script>
@@ -461,6 +474,16 @@ $primary-light: #3b82f6;
 	color: #9ca3af;
 }
 
+.popup-tip {
+	margin-top: 14rpx;
+	padding: 10rpx 24rpx;
+	background: #fef3c7;
+	border: 2rpx solid #fde68a;
+	border-radius: 10rpx;
+	color: #b45309;
+	font-size: 24rpx;
+}
+
 // 模式切换标签
 .mode-tabs {
 	display: flex;
@@ -552,6 +575,17 @@ $primary-light: #3b82f6;
 	justify-content: space-between;
 	align-items: center;
 	margin: 18rpx 0 24rpx;
+}
+
+.popup-error {
+	margin-bottom: 14rpx;
+	padding: 12rpx 16rpx;
+	background: #fef2f2;
+	border: 2rpx solid #fecaca;
+	border-radius: 10rpx;
+	color: #dc2626;
+	font-size: 24rpx;
+	line-height: 1.5;
 }
 
 .remember {

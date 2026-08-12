@@ -1,6 +1,13 @@
 <template>
 	<div class="classic-template" :class="`classic-template--${variant}`" :style="rootStyle">
 
+		<!-- 简历背景装饰层：只作用于背景，不参与内容布局 -->
+		<div class="rt-bg" :class="`rt-bg--${variant}`" :style="bgStyle" aria-hidden="true">
+			<span class="rt-bg-dot rt-bg-dot--tl"></span>
+			<span class="rt-bg-dot rt-bg-dot--tr"></span>
+			<span class="rt-bg-dot rt-bg-dot--br"></span>
+		</div>
+
 		<!-- ══ 基本信息（永远渲染） ══ -->
 		<header class="rt-basic" :class="`rt-basic--${basic.layout || 'left'}`" :style="{ marginBottom: `${gs.sectionSpacing || 16}px` }">
 			<img
@@ -216,6 +223,18 @@ const rootStyle = computed(() => ({
 	width: '100%',
 }))
 
+// 背景装饰层向外延伸 pagePadding，达到 A4 纸张边缘（全出血背景）
+const bgStyle = computed(() => {
+	const pad = Number(gs.value.pagePadding ?? 32) || 32
+	const p = `${pad}px`
+	return {
+		top: `-${p}`,
+		right: `-${p}`,
+		bottom: `-${p}`,
+		left: `-${p}`,
+	}
+})
+
 const titleStyle = computed(() => ({
 	fontSize: `${gs.value.headerSize || 18}px`,
 	fontWeight: '700',
@@ -239,7 +258,129 @@ const photoStyle = computed(() => {
 </script>
 
 <style scoped>
-.classic-template { box-sizing: border-box; }
+.classic-template {
+	box-sizing: border-box;
+	position: relative;
+}
+
+/* 内容置于背景装饰层之上，布局与样式不受影响 */
+.classic-template > :not(.rt-bg) {
+	position: relative;
+	z-index: 1;
+}
+
+/* ═══════════ 简历背景装饰（纯背景层） ═══════════ */
+.rt-bg {
+	position: absolute;
+	z-index: 0;
+	pointer-events: none;
+	background-color: #ffffff;
+	--bg-dot-a: rgba(43, 108, 176, 0.12);
+	--bg-dot-b: rgba(99, 179, 237, 0.09);
+}
+
+.rt-bg-dot {
+	position: absolute;
+	border-radius: 50%;
+}
+
+.rt-bg-dot--tl {
+	top: -80px;
+	right: -80px;
+	width: 240px;
+	height: 240px;
+	background: radial-gradient(circle, var(--bg-dot-a) 0%, transparent 62%);
+}
+
+.rt-bg-dot--tr {
+	top: 42%;
+	right: -64px;
+	width: 150px;
+	height: 150px;
+	background: radial-gradient(circle, var(--bg-dot-b) 0%, transparent 60%);
+}
+
+.rt-bg-dot--br {
+	bottom: -60px;
+	left: -60px;
+	width: 200px;
+	height: 200px;
+	background: radial-gradient(circle, var(--bg-dot-b) 0%, transparent 62%);
+}
+
+/* 主题1：经典蓝 —— 左侧渐变“侧边栏”意象 + 蓝色光晕 */
+.rt-bg--classic {
+	--bg-dot-a: rgba(43, 108, 176, 0.13);
+	--bg-dot-b: rgba(99, 179, 237, 0.09);
+	background:
+		linear-gradient(90deg, rgba(26, 54, 93, 0.05) 0%, rgba(43, 108, 176, 0.025) 15%, transparent 15%),
+		radial-gradient(circle at 12% 8%, rgba(99, 179, 237, 0.09) 0%, transparent 26%),
+		radial-gradient(circle at 90% 20%, rgba(43, 108, 176, 0.07) 0%, transparent 22%),
+		linear-gradient(135deg, #f6fafd 0%, #ffffff 46%, #f2f8fc 100%);
+}
+
+/* 主题2：极简灰 —— 顶部色带 + 柔和灰白渐变 */
+.rt-bg--professional {
+	--bg-dot-a: rgba(45, 55, 72, 0.10);
+	--bg-dot-b: rgba(113, 128, 150, 0.08);
+	background:
+		linear-gradient(180deg, rgba(45, 55, 72, 0.05) 0%, transparent 16%),
+		radial-gradient(circle at 88% 12%, rgba(113, 128, 150, 0.09) 0%, transparent 22%),
+		linear-gradient(180deg, #f8f9fa 0%, #ffffff 36%);
+}
+
+.rt-bg--professional::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 4px;
+	background: linear-gradient(135deg, rgba(45, 55, 72, 0.7), rgba(74, 85, 104, 0.7));
+}
+
+.rt-bg--professional .rt-bg-dot--tr {
+	display: none;
+}
+
+/* 主题3：科技感 —— 对角几何纹理 + 蓝紫光晕 */
+.rt-bg--creative {
+	--bg-dot-a: rgba(124, 58, 237, 0.12);
+	--bg-dot-b: rgba(59, 130, 246, 0.09);
+	background:
+		repeating-linear-gradient(45deg, transparent, transparent 40px, rgba(124, 58, 237, 0.03) 40px, rgba(124, 58, 237, 0.03) 41px),
+		radial-gradient(circle at 90% 10%, rgba(124, 58, 237, 0.10) 0%, transparent 24%),
+		radial-gradient(circle at 8% 88%, rgba(59, 130, 246, 0.08) 0%, transparent 30%),
+		linear-gradient(135deg, #faf7ff 0%, #ffffff 48%, #f4f8ff 100%);
+}
+
+.rt-bg--creative .rt-bg-dot--tl {
+	top: -90px;
+	right: -90px;
+	width: 260px;
+	height: 260px;
+}
+
+.rt-bg--creative .rt-bg-dot--br {
+	bottom: -70px;
+	left: -70px;
+	width: 220px;
+	height: 220px;
+}
+
+/* 简约：顶部居中蓝色光晕，保持干净利落 */
+.rt-bg--simple {
+	--bg-dot-a: rgba(37, 99, 235, 0.12);
+	--bg-dot-b: rgba(96, 165, 250, 0.09);
+	background:
+		radial-gradient(circle at 50% -4%, rgba(37, 99, 235, 0.08) 0%, transparent 30%),
+		radial-gradient(circle at 8% 92%, rgba(96, 165, 250, 0.07) 0%, transparent 26%),
+		linear-gradient(180deg, #f6faff 0%, #ffffff 42%);
+}
+
+.rt-bg--simple .rt-bg-dot--tr {
+	display: none;
+}
 
 /* ─── 基本信息 ─── */
 .rt-basic {

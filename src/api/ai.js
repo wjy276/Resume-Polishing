@@ -1,15 +1,17 @@
 /**
  * AI Agent API — 对接 FastAPI 智能简历优化服务
- * 基础地址: http://localhost:8000/api
+ * 基础地址: http://118.126.102.143:8000/api
  *
  * 会话管理：由后端通过 Cookie 自动管理，前端无需手动传递 session_id
  */
+
+import { useUserStore } from '@/stores/user'
 
 // 开发环境使用代理，生产环境使用完整 URL
 // VITE_AI_BASE_URL overrides the AI service base URL (e.g. deployed production).
 const AI_BASE_URL =
 	import.meta.env.VITE_AI_BASE_URL ||
-	(import.meta.env.DEV ? '/ai-api' : 'http://localhost:8000/api')
+	(import.meta.env.DEV ? '/ai-api' : 'http://118.126.102.143:8000/api')
 
 // Agent 单步执行耗时较长（fact_checker 单次最长 180s，最多重试 2 次），需要大于后端超时
 const AI_AGENT_TIMEOUT = 600000
@@ -46,6 +48,18 @@ export function aiRequest(options) {
 			withCredentials: true,
 			success: (res) => {
 				const body = res.data
+				if (res.statusCode === 401) {
+					// 登录过期：统一走 Pinia，弹出登录弹窗
+					useUserStore().markTokenExpired()
+					resolve({
+						ok: false,
+						code: 401,
+						message: '登录已过期，请重新登录',
+						data: null,
+						raw: body,
+					})
+					return
+				}
 				const code = body?.code
 				const ok = res.statusCode === 200 && (code === 0 || code === 200)
 				resolve({

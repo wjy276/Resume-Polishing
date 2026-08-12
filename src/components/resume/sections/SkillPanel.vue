@@ -18,11 +18,10 @@
 <script setup>
 import { computed } from 'vue'
 import { useResumeStore } from '@/stores/resume'
-import { useAIOptimizeStore } from '@/stores/aiOptimize'
 import RichTextEditor from '@/components/resume/RichTextEditor.vue'
 
 const store = useResumeStore()
-const aiStore = useAIOptimizeStore()
+const emit = defineEmits(['ai-optimize'])
 
 // 用 getter/setter 的 computed 实现 v-model 双向绑定 store 字段
 const content = computed({
@@ -33,8 +32,7 @@ const content = computed({
 })
 
 function handleAIOptimize() {
-	aiStore.openPanel()
-	aiStore.goToStep('optimize')
+	emit('ai-optimize')
 }
 </script>
 

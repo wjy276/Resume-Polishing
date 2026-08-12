@@ -143,7 +143,7 @@
 		<!-- Template gallery -->
 		<view v-if="showTemplateGallery" class="modal-overlay" @click.self="showTemplateGallery = false">
 			<view class="modal-box gallery-modal">
-				<TemplateGallery />
+				<TemplateGallery @close="showTemplateGallery = false" />
 			</view>
 		</view>
 	</view>

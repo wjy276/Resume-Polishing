@@ -1,8 +1,12 @@
 <template>
 	<view class="template-gallery">
 		<view class="gallery-header">
+			<button class="back-btn" @click="$emit('close')" title="返回">
+				<svg viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+				<text>返回</text>
+			</button>
 			<text class="gallery-title">模板广场</text>
-			<text class="gallery-desc">选择社区分享的简历模板，快速创建专业简历</text>
+			<text class="gallery-desc">选择模板快速创建简历，内置预填示例内容的示例模板</text>
 		</view>
 
 		<view class="gallery-filters">
@@ -35,7 +39,18 @@
 				@click="handleUseTemplate(template)"
 			>
 				<view class="card-preview">
-					<view class="preview-placeholder">
+					<text v-if="template.builtin" class="builtin-badge">示例</text>
+					<!-- 内置示例：实时渲染简历缩略图 -->
+					<view v-if="template.builtin" :ref="setSamplePreview" class="sample-preview" :style="samplePreviewStyle">
+						<div class="preview-scaler" :style="sampleScalerStyle">
+							<div class="preview-inner" :style="sampleInnerStyle">
+								<ClassicTemplate :data="sampleResume" />
+							</div>
+						</div>
+					</view>
+					<!-- 服务端模板：有缩略图则展示图片 -->
+					<image v-else-if="template.thumbnail" class="card-thumb" :src="template.thumbnail" mode="aspectFill" />
+					<view v-else class="preview-placeholder">
 						<text class="preview-icon">📄</text>
 					</view>
 					<view class="card-overlay">
@@ -59,15 +74,80 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useTemplateStore } from '@/stores/template'
 import { useResumeStore } from '@/stores/resume'
+import ClassicTemplate from '@/components/resume/ClassicTemplate.vue'
+import { createSampleResume } from '@/utils/resume/initialData'
+
+defineEmits(['close'])
 
 const templateStore = useTemplateStore()
 const resumeStore = useResumeStore()
 
 const loading = ref(false)
 const selectedCategory = ref('')
+const samplePreviewRef = ref(null)
+const sampleScale = ref(0.25)
+let sampleResizeObserver = null
+
+const A4_WIDTH_PX = 793.7
+const A4_HEIGHT_PX = Math.round((A4_WIDTH_PX * 297) / 210)
+const sampleResume = createSampleResume({ title: '示例简历（可直接修改）' })
+
+const sampleScalerStyle = computed(() => ({
+	width: `${A4_WIDTH_PX}px`,
+	height: `${A4_HEIGHT_PX}px`,
+	transform: `scale(${sampleScale.value})`,
+	transformOrigin: 'top left',
+	position: 'absolute',
+	top: '0',
+	left: '0',
+}))
+
+// 外层盒子与缩放后的图片同尺寸，保证图片完整显示且不裁剪
+const samplePreviewStyle = computed(() => ({
+	width: `${Math.round(A4_WIDTH_PX * sampleScale.value)}px`,
+	height: `${Math.round(A4_HEIGHT_PX * sampleScale.value)}px`,
+}))
+
+const sampleInnerStyle = computed(() => {
+	const gs = sampleResume?.globalSettings || {}
+	return {
+		padding: `${gs.pagePadding ?? 32}px`,
+		background: '#ffffff',
+		width: '100%',
+		height: '100%',
+		boxSizing: 'border-box',
+	}
+})
+
+// v-for 中的字符串 ref 会被收集成数组，这里用函数 ref 拿真实元素
+function setSamplePreview(el) {
+	// uni-app 的 <view> 是组件，函数 ref 收到的是组件实例，需要取 $el
+	const dom = el && el.$el ? el.$el : el
+	samplePreviewRef.value = dom || null
+	if (!dom) return
+	if (dom?.parentElement) {
+		updateSampleScale()
+		if (typeof ResizeObserver !== 'undefined') {
+			sampleResizeObserver?.disconnect()
+			sampleResizeObserver = new ResizeObserver(updateSampleScale)
+			sampleResizeObserver.observe(dom.parentElement)
+		}
+	}
+}
+
+function updateSampleScale() {
+	const el = samplePreviewRef.value
+	const container = el?.parentElement
+	if (!container?.clientWidth || !container.clientHeight) return
+	// 预留卡片内边距，让图片完整放进预览区
+	const availW = container.clientWidth - 24
+	const availH = container.clientHeight - 24
+	const scale = Math.min(availW / A4_WIDTH_PX, availH / A4_HEIGHT_PX)
+	if (scale > 0) sampleScale.value = scale
+}
 
 const categories = [
 	{ value: '', label: '全部' },
@@ -77,15 +157,31 @@ const categories = [
 	{ value: 'custom', label: '自定义' },
 ]
 
+// 内置示例模板：直接使用 createSampleResume 生成预填示例内容的简历
+const builtInTemplates = [
+	{
+		id: 'builtin-sample',
+		name: '示例简历模板',
+		description: '预填完整示例内容，可直接在此基础上修改',
+		category: 'tech',
+		author: '智简优面',
+		usageCount: 0,
+		builtin: true,
+	},
+]
+
 const filteredTemplates = computed(() => {
-	if (!selectedCategory.value) return templateStore.templates
-	return templateStore.templates.filter(t => t.category === selectedCategory.value)
+	const source = [...builtInTemplates, ...templateStore.templates]
+	if (!selectedCategory.value) return source
+	return source.filter(t => t.category === selectedCategory.value)
 })
 
 onMounted(async () => {
 	loading.value = true
 	await templateStore.loadTemplates()
 	loading.value = false
+	await nextTick()
+	updateSampleScale()
 })
 
 function getCategoryLabel(category) {
@@ -101,7 +197,17 @@ function getCategoryLabel(category) {
 async function handleUseTemplate(template) {
 	uni.showLoading({ title: '创建中...' })
 
-	const result = await templateStore.useTemplate(template.id)
+	let result
+	if (template.builtin) {
+		// 内置示例：直接创建预填示例内容的简历
+		const created = await resumeStore.createResumeOnServer({
+			title: '示例简历（可直接修改）',
+		})
+		result = created.success ? { success: true, data: { resumeId: created.id } } : created
+	} else {
+		result = await templateStore.useTemplate(template.id)
+	}
+
 	if (result.success && result.data) {
 		uni.hideLoading()
 		uni.showToast({ title: '创建成功', icon: 'success' })
@@ -122,6 +228,32 @@ async function handleUseTemplate(template) {
 
 .gallery-header {
 	margin-bottom: 20px;
+}
+
+.back-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 14px 6px 10px;
+	border: 1px solid var(--border-color);
+	border-radius: 8px;
+	background: var(--bg-card);
+	color: var(--text-secondary);
+	font-size: 13px;
+	cursor: pointer;
+	margin-bottom: 12px;
+	transition: all var(--transition-fast);
+
+	svg {
+		width: 14px;
+		height: 14px;
+	}
+
+	&:hover {
+		border-color: var(--primary-light);
+		color: var(--primary-light);
+		background: rgba(37, 99, 235, 0.04);
+	}
 }
 
 .gallery-title {
@@ -238,19 +370,56 @@ async function handleUseTemplate(template) {
 }
 
 .card-preview {
-	height: 180px;
-	background: var(--bg-page);
+	height: 220px;
+	padding: 12px;
+	background: linear-gradient(160deg, #f8fafc 0%, #eef2f7 100%);
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	position: relative;
 	overflow: hidden;
+	box-sizing: border-box;
 }
 
 .preview-placeholder {
 	display: flex;
 	align-items: center;
 	justify-content: center;
+}
+
+.sample-preview {
+	position: relative;
+	flex-shrink: 0;
+	overflow: hidden;
+	background: #fff;
+	pointer-events: none;
+	border-radius: 6px;
+	box-shadow: 0 4px 16px rgba(15, 23, 42, 0.14);
+	transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+
+	.template-card:hover & {
+		transform: scale(1.03);
+		box-shadow: 0 8px 22px rgba(15, 23, 42, 0.2);
+	}
+}
+
+.card-thumb {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+.builtin-badge {
+	position: absolute;
+	top: 8px;
+	left: 8px;
+	z-index: 2;
+	padding: 2px 8px;
+	background: linear-gradient(135deg, #3b82f6, #2563eb);
+	color: #fff;
+	font-size: 11px;
+	font-weight: 600;
+	border-radius: 4px;
 }
 
 .preview-icon {

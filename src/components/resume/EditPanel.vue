@@ -25,6 +25,7 @@
 				v-if="currentPanel"
 				:key="activeSection"
 				v-bind="currentPanelProps"
+				@ai-optimize="emit('ai-optimize')"
 			/>
 		</transition>
 		</template>
@@ -39,6 +40,7 @@ import { normalizeMenuSection } from '@/utils/resume/serializer'
 
 const store = useResumeStore()
 const { activeResume } = storeToRefs(store)
+const emit = defineEmits(['ai-optimize'])
 const activeSection = computed(() => activeResume.value?.activeSection || 'basic')
 const currentSection = computed(() => {
 	const sections = activeResume.value?.menuSections || []

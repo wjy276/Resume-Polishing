@@ -26,7 +26,11 @@
 						class="user-avatar"
 						mode="aspectFill"
 						@error="onAvatarError"
+						@click="handleAvatarClick"
 					/>
+					<button v-if="isLogin" class="logout-btn" @click="handleLogout" title="退出登录">
+						<svg viewBox="0 0 16 16" fill="none"><path d="M10.5 4.5L14 8l-3.5 3.5M14 8H6M6 2.5H3a1 1 0 00-1 1v9a1 1 0 001 1h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					</button>
 				</view>
 			</view>
 
@@ -163,6 +167,29 @@ function onAvatarError() {
 	avatarLoadFailed.value = true
 }
 
+// 点击头像：未登录打开登录弹窗，已登录进入“我的”
+const handleAvatarClick = () => {
+	if (isLogin.value) {
+		window.location.href = '/#/pages/My/My'
+	} else {
+		userStore.openLoginPopup()
+	}
+}
+
+const handleLogout = () => {
+	uni.showModal({
+		title: '退出登录',
+		content: '确定要退出当前账号吗？',
+		confirmText: '退出',
+		cancelText: '取消',
+		success: async (res) => {
+			if (!res.confirm) return
+			await userStore.logout()
+			uni.showToast({ title: '已退出登录', icon: 'none' })
+		}
+	})
+}
+
 const startExplore = () => {
 	window.location.href = '/#/pages/Job/Job'
 }
@@ -276,6 +303,31 @@ const goToInterview = () => {
 
 	&:hover {
 		border-color: var(--primary-light);
+	}
+}
+
+.logout-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	border: 1px solid var(--border-color);
+	border-radius: 50%;
+	background: var(--bg-card);
+	color: var(--text-secondary);
+	cursor: pointer;
+	transition: all var(--transition-fast);
+
+	svg {
+		width: 13px;
+		height: 13px;
+	}
+
+	&:hover {
+		border-color: var(--danger-color);
+		color: var(--danger-color);
+		background: rgba(239, 68, 68, 0.06);
 	}
 }
 

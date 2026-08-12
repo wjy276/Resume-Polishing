@@ -1,14 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-// API 基础地址
-const BASE_URL = 'http://81.71.75.85:6008/api'
+// API 基础地址：开发环境走 Vite 代理，避免跨域；生产使用完整 URL
+const BASE_URL = import.meta.env.DEV ? '/api' : 'http://81.71.75.85:6008/api'
 
 export const useUserStore = defineStore('user', () => {
 	// 状态
 	const token = ref(uni.getStorageSync('token') || '')
 	const userInfo = ref(uni.getStorageSync('userInfo') || null)
 	const isLogin = ref(!!uni.getStorageSync('token'))
+	const tokenExpired = ref(false)
+	const loginPopupVisible = ref(false)
 
 	// 计算属性
 	const userName = computed(() => userInfo.value?.nickname || userInfo.value?.username || '未登录')
@@ -62,6 +64,8 @@ export const useUserStore = defineStore('user', () => {
 								remainingQuota: data.remainingQuota
 							}
 							isLogin.value = true
+							tokenExpired.value = false
+							loginPopupVisible.value = false
 							uni.setStorageSync('token', data.token)
 							uni.setStorageSync('userInfo', userInfo.value)
 							resolve({ success: true, data })
@@ -144,8 +148,27 @@ export const useUserStore = defineStore('user', () => {
 		token.value = ''
 		userInfo.value = null
 		isLogin.value = false
+		tokenExpired.value = false
 		uni.removeStorageSync('token')
 		uni.removeStorageSync('userInfo')
+	}
+
+	/**
+	 * 标记登录过期：清空登录态并弹出登录弹窗
+	 * 任何请求收到 401 时调用，由 App.vue 全局监听并复用 LoginPopup
+	 */
+	const markTokenExpired = () => {
+		clearAuth()
+		tokenExpired.value = true
+		loginPopupVisible.value = true
+	}
+
+	const openLoginPopup = () => {
+		loginPopupVisible.value = true
+	}
+
+	const closeLoginPopup = () => {
+		loginPopupVisible.value = false
 	}
 
 	/**
@@ -188,8 +211,7 @@ export const useUserStore = defineStore('user', () => {
 				},
 				success: (res) => {
 					if (res.statusCode === 401) {
-						clearAuth()
-						uni.$emit('token-expired')
+						markTokenExpired()
 						resolve({ success: false, message: '登录已过期' })
 						return
 					}
@@ -247,12 +269,17 @@ export const useUserStore = defineStore('user', () => {
 		token,
 		userInfo,
 		isLogin,
+		tokenExpired,
+		loginPopupVisible,
 		userName,
 		hasToken,
 		login,
 		register,
 		logout,
 		clearAuth,
+		markTokenExpired,
+		openLoginPopup,
+		closeLoginPopup,
 		fetchUserInfo,
 		checkLogin,
 		updateUserInfo

@@ -10,7 +10,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, reactive, computed, watch } from 'vue'
-import { createBlankResume, createNewResume, generateId, DEFAULT_GLOBAL_SETTINGS, DEFAULT_PHOTO_CONFIG, DEFAULT_FIELD_ORDER } from '@/utils/resume/initialData'
+import { createSampleResume, generateId, DEFAULT_GLOBAL_SETTINGS, DEFAULT_PHOTO_CONFIG, DEFAULT_FIELD_ORDER } from '@/utils/resume/initialData'
 import { toApiPayload, toSafeApiPayload, fromApiResponse, mergeMenuSections, mergeResumeWithDraft } from '@/utils/resume/serializer'
 import {
 	fetchResumeList,
@@ -120,9 +120,11 @@ export const useResumeStore = defineStore('resume', () => {
 
 	/** 仅本地创建（未登录降级） */
 	function createResume(overrides = {}) {
-		const r = createNewResume(overrides)
+		const r = createSampleResume(overrides)
 		resumes[r.id] = r
 		activeResumeId.value = r.id
+		// 立即持久化，避免跳转编辑器后因防抖未执行而丢失新简历
+		saveToLocal()
 		return r.id
 	}
 
@@ -169,7 +171,7 @@ export const useResumeStore = defineStore('resume', () => {
 
 	/** 创建简历并同步到后端 */
 	async function createResumeOnServer(overrides = {}) {
-		const draft = createBlankResume({
+		const draft = createSampleResume({
 			title: overrides.title || `新建简历 ${Object.keys(resumes).length + 1}`,
 			templateId: overrides.templateId || 'classic',
 			...overrides,

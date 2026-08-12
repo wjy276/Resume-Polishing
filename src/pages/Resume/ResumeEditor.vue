@@ -75,7 +75,7 @@
 			<!-- Center: EditPanel -->
 			<transition name="slide-left">
 				<div v-show="!editPanelCollapsed" class="panel panel-edit">
-					<EditPanel />
+					<EditPanel @ai-optimize="openAIPanel" />
 				</div>
 			</transition>
 
@@ -169,6 +169,14 @@
 			@saved="handleTemplateSaved"
 		/>
 
+		<!-- 全局登录弹窗：token 过期时复用登录弹窗 -->
+		<LoginPopup
+			:visible="userStore.loginPopupVisible"
+			:tip="userStore.tokenExpired ? '登录已过期，请重新登录' : ''"
+			@update:visible="userStore.closeLoginPopup()"
+			@success="userStore.closeLoginPopup()"
+		/>
+
 		<button class="mobile-ai-fab" @click="openAIPanel" aria-label="AI 优化">
 			<svg viewBox="0 0 16 16" fill="none"><path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
 			<span>AI</span>
@@ -190,6 +198,7 @@ import { normalizeMenuSection } from '@/utils/resume/serializer'
 import SidePanel from '@/components/resume/SidePanel.vue'
 import EditPanel from '@/components/resume/EditPanel.vue'
 import ClassicTemplate from '@/components/resume/ClassicTemplate.vue'
+import LoginPopup from '@/components/LoginPopup/LoginPopup.vue'
 import AIOptimizeDialog from '@/components/AIOptimize/AIOptimizeDialog.vue'
 import ChatDialog from '@/components/AIOptimize/ChatDialog.vue'
 import AIOptimizeAnalysisPanel from '@/components/AIOptimize/AIOptimizeAnalysisPanel.vue'

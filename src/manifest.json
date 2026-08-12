@@ -82,7 +82,7 @@
                     "proxyTimeout" : 60000
                 },
                 "/ai-api" : {
-                    "target" : "http://localhost:8000",
+                    "target" : "http://118.126.102.143:8000",
                     "changeOrigin" : true,
                     "secure" : false,
                     "ws" : false,

@@ -86,11 +86,10 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useResumeStore } from '@/stores/resume'
-import { useAIOptimizeStore } from '@/stores/aiOptimize'
 import RichTextEditor from '@/components/resume/RichTextEditor.vue'
 
 const store = useResumeStore()
-const aiStore = useAIOptimizeStore()
+const emit = defineEmits(['ai-optimize'])
 // 注意：返回的是 reactive 数组，v-model="exp.company" 直接 mutate 即实时响应
 const list = computed(() => store.activeResume?.experience || [])
 const expanded = ref(null)
@@ -108,9 +107,8 @@ function addItem() {
 	if (id) expanded.value = id
 }
 
-function handleAIOptimize(itemId) {
-	aiStore.openPanel()
-	aiStore.goToStep('optimize')
+function handleAIOptimize() {
+	emit('ai-optimize')
 }
 
 function getStart(date) {

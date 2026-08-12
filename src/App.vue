@@ -1,27 +1,30 @@
 <template>
 	<view class="app-container">
 		<slot />
-		<TokenExpiredPopup
-			:visible="showExpiredPopup"
-			@update:visible="showExpiredPopup = $event"
-			@confirm="showExpiredPopup = false"
-			@cancel="showExpiredPopup = false"
-		/>
 	</view>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { watch } from 'vue'
 import { onLaunch } from '@dcloudio/uni-app'
-import TokenExpiredPopup from '@/components/TokenExpiredPopup/TokenExpiredPopup.vue'
+import { useUserStore } from '@/stores/user'
 
-const showExpiredPopup = ref(false)
+const userStore = useUserStore()
 
 onLaunch(() => {
+	// 兼容旧逻辑：任何模块收到 token-expired 事件都统一走 Pinia
 	uni.$on('token-expired', () => {
-		showExpiredPopup.value = true
+		userStore.markTokenExpired()
 	})
 })
+
+// 登录成功后自动关闭弹窗
+watch(
+	() => userStore.isLogin,
+	(val) => {
+		if (val) userStore.closeLoginPopup()
+	}
+)
 </script>
 
 <style lang="scss">
