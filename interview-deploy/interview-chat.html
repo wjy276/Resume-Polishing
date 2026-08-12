@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>面试进行中 - AI 求职助手</title>
+  <link rel="stylesheet" href="styles/common.css" />
+  <link rel="stylesheet" href="styles/interview-chat.css" />
+  <link rel="stylesheet" href="styles/summary-modal.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="logo-icon">&#10022;</div>
+        <div><div class="logo-text">AI 求职助手</div><div class="logo-sub">智能匹配 · 精准求职</div></div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item"><span class="nav-icon">&#127968;</span><span>首页</span></a>
+      <a href="#" class="nav-item"><span class="nav-icon">&#127919;</span><span>职位推荐</span></a>
+      <a href="#" class="nav-item"><span class="nav-icon">&#128196;</span><span>简历优化</span></a>
+      <a href="interview.html" class="nav-item active"><span class="nav-icon">&#128172;</span><span>模拟面试</span></a>
+      <a href="#" class="nav-item"><span class="nav-icon">&#128100;</span><span>我的</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info"><div class="user-avatar">C</div><div><div class="user-name">Cynthia</div><div class="user-status">已登录</div></div></div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <div class="chat-page">
+      <header class="chat-header" id="chatHeader">
+        <div class="chat-header-left"><h1>模拟面试</h1><span class="subtitle">AI语音对话模拟真实面试场景</span></div>
+        <div class="chat-header-center"><span class="session-id" id="sessionId" title=""></span></div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+          <span class="status-badge ongoing" id="statusBadge"><span class="dot"></span><span>面试进行中</span></span>
+          <button class="btn-end" id="btnEndInterview"><span>&#10005;</span><span>结束面试</span></button>
+        </div>
+      </header>
+
+      <div class="phase-progress" id="phaseProgress"></div>
+      <div class="chat-messages" id="chatMessages"></div>
+
+      <div class="chat-input-area">
+        <div class="input-hint" id="inputHint">提示：点击麦克风录音并保存音频文件，或在上方输入框直接输入回答</div>
+        <div class="text-input-wrapper" id="textInputWrapper">
+          <input type="text" id="textInput" placeholder="请输入你的回答..." />
+          <button class="btn-send" id="btnSend">&#9654;</button>
+        </div>
+        <div class="input-controls">
+          <button class="btn-voice" id="btnVoice" title="切换文本输入">&#128266;</button>
+          <button class="btn-mic" id="btnMic" title="点击录音">&#127908;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="scripts/common.js"></script>
+  <script src="scripts/interview-chat.js"></script>
+</body>
+</html>
