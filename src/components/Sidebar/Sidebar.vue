@@ -1,5 +1,13 @@
 <template>
-	<view class="sidebar">
+	<!-- 手机端抽屉遮罩 -->
+	<view v-if="isMobile && sidebarOpen" class="sidebar-overlay" @click="closeSidebar"></view>
+
+	<!-- 手机端菜单按钮 -->
+	<view v-if="isMobile" class="mobile-menu-btn" :class="{ open: sidebarOpen }" @click="toggleSidebar">
+		<text class="mobile-menu-icon">{{ sidebarOpen ? '✕' : '☰' }}</text>
+	</view>
+
+	<view class="sidebar" :class="{ open: sidebarOpen }">
 		<!-- Logo 区域 -->
 		<view class="logo-section" @click="navigate('home')">
 			<view class="logo-icon">
@@ -57,7 +65,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import LoginPopup from '@/components/LoginPopup/LoginPopup.vue'
 import { useUserStore } from '@/stores/user'
@@ -66,6 +74,11 @@ import { DEFAULT_AVATAR, resolveAvatar } from '@/utils/avatar'
 // 全局登录状态
 const userStore = useUserStore()
 const { isLogin, userInfo } = storeToRefs(userStore)
+
+// 手机端抽屉状态
+const isMobile = ref(false)
+const sidebarOpen = ref(false)
+let mediaQuery = null
 
 // 登录过期提示（复用 LoginPopup 弹窗）
 const expiredTip = computed(() =>
@@ -132,6 +145,7 @@ const pageMap = {
 
 // 导航 - 使用 window.location 直接跳转，避免 uni-app 路由的闪烁问题
 const navigate = (pageId) => {
+	closeSidebar()
 	if (currentPage.value === pageId) return
 
 	const url = pageMap[pageId]
@@ -151,6 +165,20 @@ const navigate = (pageId) => {
 	} else {
 		setTimeout(doNav, 50)
 	}
+}
+
+const toggleSidebar = () => {
+	sidebarOpen.value = !sidebarOpen.value
+}
+
+const closeSidebar = () => {
+	sidebarOpen.value = false
+}
+
+const updateViewport = () => {
+	if (!mediaQuery) return
+	isMobile.value = mediaQuery.matches
+	if (!isMobile.value) sidebarOpen.value = false
 }
 
 // 点击用户区域
@@ -180,6 +208,22 @@ const handleLogout = () => {
 // 组件挂载时同步 store 与 storage
 onMounted(() => {
 	userStore.checkLogin()
+	mediaQuery = window.matchMedia('(max-width: 767px)')
+	updateViewport()
+	if (mediaQuery.addEventListener) {
+		mediaQuery.addEventListener('change', updateViewport)
+	} else if (mediaQuery.addListener) {
+		mediaQuery.addListener(updateViewport)
+	}
+})
+
+onUnmounted(() => {
+	if (!mediaQuery) return
+	if (mediaQuery.removeEventListener) {
+		mediaQuery.removeEventListener('change', updateViewport)
+	} else if (mediaQuery.removeListener) {
+		mediaQuery.removeListener(updateViewport)
+	}
 })
 </script>
 
@@ -200,6 +244,7 @@ $sidebar-width: 240px;
 	top: 0;
 	z-index: 1000;
 	box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+	transition: transform 0.3s ease;
 }
 
 .logo-section {
@@ -421,6 +466,60 @@ $sidebar-width: 240px;
 	&:hover {
 		background: rgba(239, 68, 68, 0.3);
 		color: #ffffff;
+	}
+}
+
+/* ── 手机端抽屉 ── */
+.sidebar-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.45);
+	z-index: 1090;
+	animation: sidebarFadeIn 0.2s ease;
+}
+
+@keyframes sidebarFadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+.mobile-menu-btn {
+	position: fixed;
+	top: 12px;
+	left: 12px;
+	z-index: 1200;
+	width: 42px;
+	height: 42px;
+	border-radius: 10px;
+	background: #ffffff;
+	border: 1px solid #e5e7eb;
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: all 0.2s ease;
+
+	.mobile-menu-icon {
+		font-size: 20px;
+		color: #1f2937;
+		line-height: 1;
+	}
+}
+
+@media (max-width: 767px) {
+	.sidebar {
+		transform: translateX(-100%);
+		box-shadow: none;
+
+		&.open {
+			transform: translateX(0);
+			box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+		}
 	}
 }
 </style>

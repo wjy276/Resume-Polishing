@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>模拟面试 - AI 求职助手</title>
+  <link rel="stylesheet" href="styles/common.css" />
+  <link rel="stylesheet" href="styles/interview.css" />
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <div class="logo-icon">&#10022;</div>
+        <div><div class="logo-text">AI 求职助手</div><div class="logo-sub">智能匹配 · 精准求职</div></div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item"><span class="nav-icon">&#127968;</span><span>首页</span></a>
+      <a href="#" class="nav-item"><span class="nav-icon">&#127919;</span><span>职位推荐</span></a>
+      <a href="#" class="nav-item"><span class="nav-icon">&#128196;</span><span>简历优化</span></a>
+      <a href="interview.html" class="nav-item active"><span class="nav-icon">&#128172;</span><span>模拟面试</span></a>
+      <a href="#" class="nav-item"><span class="nav-icon">&#128100;</span><span>我的</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info"><div class="user-avatar">C</div><div><div class="user-name">Cynthia</div><div class="user-status">已登录</div></div></div>
+    </div>
+  </aside>
+
+  <div class="main-content">
+    <header class="top-bar">
+      <div class="search-box"><span class="search-icon">&#128269;</span><input type="text" id="searchInput" placeholder="搜索面试类型、岗位..." /></div>
+      <div class="top-actions">
+        <button class="action-btn">&#128276;<span class="badge"></span></button>
+        <button class="action-btn">&#9881;</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div class="interview-header"><h1>模拟面试</h1><p>AI语音对话模拟真实面试场景</p></div>
+
+      <div class="job-input-section">
+        <h2>&#127919; 目标岗位</h2>
+        <div class="job-input-wrapper"><span class="input-icon">&#128188;</span><input type="text" id="jobInput" placeholder="请输入目标岗位，如：前端开发工程师" /></div>
+        <div class="hot-jobs" id="hotJobs"><span class="hot-jobs-label">热门岗位：</span></div>
+      </div>
+
+      <div class="config-section">
+        <h3>&#128295; 面试配置</h3>
+        <div class="config-row"><span class="config-label">面试模式</span><div class="radio-group"><label class="radio-item active" data-mode="voice"><input type="radio" name="mode" value="voice" checked />&#127908; 语音对话</label><label class="radio-item" data-mode="text"><input type="radio" name="mode" value="text" />&#128172; 文字输入</label></div></div>
+        <div class="config-row"><span class="config-label">语音播放</span><div class="radio-group"><label class="radio-item active" data-tts="true"><input type="radio" name="tts" value="true" checked />&#128266; 开启</label><label class="radio-item" data-tts="false"><input type="radio" name="tts" value="false" />&#128263; 关闭</label></div></div>
+      </div>
+
+      <div class="cta-banner">
+        <div class="cta-text"><h2>准备好了吗？</h2><p>AI 将根据您的简历智能生成面试问题，现在开始模拟真实面试场景</p></div>
+        <button class="btn-start" id="btnStartInterview"><span>&#128222;</span><span>开始面试</span></button>
+      </div>
+
+      <div class="history-section">
+        <div class="history-header"><h3><span>&#9201;</span><span>历史记录</span></h3><a href="#" class="view-all"><span>查看全部</span><span>&#8594;</span></a></div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="scripts/common.js"></script>
+  <script src="scripts/interview.js"></script>
+</body>
+</html>
