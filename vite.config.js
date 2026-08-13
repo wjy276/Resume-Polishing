@@ -16,7 +16,7 @@ export default defineConfig({
       '/api': {
         target: 'http://81.71.75.85:6008',
         changeOrigin: true,
-        ws: false,
+        ws: true,
       },
       '/ai-api': {
         target: 'http://118.126.102.143:8000',
