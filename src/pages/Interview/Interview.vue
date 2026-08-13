@@ -6,6 +6,7 @@
 		<Sidebar />
 		<view class="page-main interview-main">
 			<view class="interview-page-wrapper">
+				
 				<!-- 顶部导航栏 -->
 				<view class="top-nav">
 					<view class="search-box">
